@@ -9,3 +9,6 @@ Introduction to Robotics laboratory assignments completed during the third year 
 ![Static Badge](https://img.shields.io/badge/Unibuc_Robotics-blue?style=for-the-badge&logo=facebook&color=gray&link=https%3A%2F%2Fwww.facebook.com%2Funibuc.robotics)
 
 ![Static Badge](https://img.shields.io/badge/Unibuc_Robotics-blue?style=for-the-badge&logo=instagram&color=pink&link=https%3A%2F%2Fwww.instagram.com%2Funibuc.robotics%2F)
+
+<img alt="Static Badge" src="https://img.shields.io/badge/Faculty_of_Mathematics_and_Computer_Science-blue?style=for-the-badge">
+
