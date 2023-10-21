@@ -28,6 +28,10 @@ const int inputRed = A0;
 const int inputGreen = A1;
 const int inputBlue = A2;
 
+const int outputLedRed = 9;
+const int outputLedGreen = 10;
+const int outputLedBlue = 11;
+
 int redValue = 0;
 int greenValue = 0;
 int blueValue = 0;
@@ -35,10 +39,6 @@ int blueValue = 0;
 int redValuePWM = 0;
 int greenValuePWM = 0;
 int blueValuePWM = 0;
-
-const int outputLedRed = 9;
-const int outputLedGreen = 10;
-const int outputLedBlue = 11;
 
 void setup() {
 
