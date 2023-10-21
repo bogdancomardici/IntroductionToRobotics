@@ -14,6 +14,11 @@ _Introduction to Robotics laboratory assignments completed during the third year
 This assignment focuses on controlling each channel (Red, Green, and Blue) of  an  RGB  LED  using  individual  potentiometers.
 Three Potentiometers, one RGB LED and coresponding wires and resistors were used to build this project. Capacitors were also used to _filter_ the noisy input of the potentiometers. The potentiometers’s analog values are read with an Arduino UNO and then the mamapped values are written to the LED pins.
 
-![Homework #1 Circuit](Homework_1_RGB_LED/rgb_led.jpg)
-
 Video: https://youtu.be/MSEW_lssp1M?si=4kzzFp8WuwO-5N67
+
+<p align = center>
+  <img src="Homework_1_RGB_LED/rgb_led.jpg" width = 50%>
+</p>
+
+
+
