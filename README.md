@@ -20,5 +20,25 @@ Video: https://youtu.be/MSEW_lssp1M?si=4kzzFp8WuwO-5N67
   <img src="Homework_1_RGB_LED/rgb_led.jpg" width = 50%>
 </p>
 
+## Homework #2
+
+The scope of this project is to simulate a three floor elevator control system.
+Each floor is represented by one LED, the current floor LED lights up to represent
+the elevator moving through the floors. An additional LED is used to indicate the elevator
+status. This LED remains static while the elevator si stationary and blinks while the elevator 
+is moving. 
+Three buttons are used to call the elevator. The movement to each floor is simulated through cycling 
+through the coresponding floors LEDs
+A buzzer is used to play sounds such as: the elevator doors closing, the elevator moving and the "cling"
+sound an elevator makes when it reaches the desired floor.
+If the elevator is already at the selected floor pressing the corresponding button has no effect.
+Additionally, when the elevator is traveling, button presses are ignored.
+To avoid unintentional button presses we use a debouncing technique.
+
+Video: https://youtu.be/foRM9pGMEos
+
+<p align = center>
+  <img src="Homework_2_Elevator_Simulator/elevator_simulator.jpg" width = 50%>
+</p>
 
 
