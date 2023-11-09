@@ -71,8 +71,8 @@ A four digit 7 segment display along with a 74HC595N shift register is used to d
 with a tenth of a second precision.
 Three buttons are used to control the stopwatch - start/pause, reset, save/cycle lap time.
 
-If the lap button is pressed during the timer counter the lap time is saved. We can only save the last
-lap time, we overwrite the oldest one.
+If the lap button is pressed during the timer counter the lap time is saved. We can only save the last four
+lap times, when the limit is reached, we start overwriting the oldest saved lap time.
 
 The reset button only works while the timer is paused.
 
