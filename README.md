@@ -68,15 +68,15 @@ The scope of this project is to build a simple stopwatch with the following func
   - view and reset the lap times
 
 A four digit 7 segment display along with a 74HC595N shift register is used to display the timer,
-with a tenth of a second precision
-Three buttons are used to control the stopwatch - start/pause, reset, save/cycle lap time
+with a tenth of a second precision.
+Three buttons are used to control the stopwatch - start/pause, reset, save/cycle lap time.
 
 If the lap button is pressed during the timer counter the lap time is saved. We can only save the last
 lap time, we overwrite the oldest one.
 
-The reset button only works while the timer is paused
+The reset button only works while the timer is paused.
 
-In pause mode, the lap button cycles through the saved lap times
+In pause mode, the lap button cycles through the saved lap times.
 
 Pressing the reset button in lap cycle mode, resets the saved laps.
 Pressing the reset button in timer mode (paused) resets the timer.
