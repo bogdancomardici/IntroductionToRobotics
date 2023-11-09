@@ -86,11 +86,11 @@ unsigned long lastDebounceTime = 0;
 unsigned long currentTime = 0;
 
 const int noLaps = 4;
-unsigned long lapTimes[noLaps] = { 0, 0, 0, 0 };
-int lastLapNumber = 0;
+volatile unsigned long lapTimes[noLaps] = { 0, 0, 0, 0 };
+volatile int lastLapNumber = 0;
 
 volatile bool stopwatchRunning = false;
-bool enterLapCycle = false;
+volatile bool enterLapCycle = false;
 
 int resetTriggerState;
 int lastresetTriggerState = LOW;
