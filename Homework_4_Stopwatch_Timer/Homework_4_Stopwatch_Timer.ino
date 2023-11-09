@@ -21,7 +21,7 @@
     Pressing the reset button in lap cycle mode, resets the saved laps.
     Pressing the reset button in timer mode (paused) resets the timer.
 
-    Interrupts are used on the start/pause and reset buttons to increase timing precision.
+    Interrupts are used on the start/pause and save lap buttons to increase timing precision.
 
     Pins 10, 11, 12 are used to control the shift register clock, latch and data inputs.
     Pins 4, 5, 6, 7 are used to light up the four digits of the 7 segment display using the shift register.
@@ -54,8 +54,8 @@ const int segD3 = 6;
 const int segD4 = 7;
 
 const int startPauseTrigger = 2;
-const int resetTrigger = 3;
-const int lapTrigger = 9;
+const int lapTrigger = 3;
+const int resetTrigger = 9;
 
 int displayDigits[] = { segD1, segD2, segD3, segD4 };
 const int displayCount = 4;
@@ -92,9 +92,9 @@ int lastLapNumber = 0;
 volatile bool stopwatchRunning = false;
 bool enterLapCycle = false;
 
-int lapTriggerState;
-int lastLapTriggerState = LOW;
-int lapTriggerValue;
+int resetTriggerState;
+int lastresetTriggerState = LOW;
+int resetTriggerValue;
 
 void setup() {
 
@@ -112,42 +112,32 @@ void setup() {
   }
 
   attachInterrupt(digitalPinToInterrupt(startPauseTrigger), startPauseTimer, FALLING);
-  attachInterrupt(digitalPinToInterrupt(resetTrigger), resetTimer, FALLING);
+  attachInterrupt(digitalPinToInterrupt(lapTrigger), saveLap, FALLING);
 }
 
 void loop() {
 
   currentMillis = millis();
-  lapTriggerValue = digitalRead(lapTrigger);
+  resetTriggerValue = digitalRead(resetTrigger);
 
   // debounce the lap button input
-  if (lapTriggerValue != lastLapTriggerState) {
+  if (resetTriggerValue != lastresetTriggerState) {
     lastDebounceTime = currentMillis;
   }
 
   if ((currentMillis - lastDebounceTime) > debounceDelay) {
 
-    if (lapTriggerValue != lapTriggerState) {
+    if (resetTriggerValue != resetTriggerState) {
 
-      lapTriggerState = lapTriggerValue;
+      resetTriggerState = resetTriggerValue;
 
-      if (lapTriggerState == LOW) {
-        // if the stopwatch is running we save the lap time
-        if (stopwatchRunning)
-          saveLap(currentTime);
-        else {
-          // if the stopwatch is paused we can cycle through the saved lap times
-          enterLapCycle = true;
-          if (lastLapNumber < noLaps - 1)
-            lastLapNumber++;
-          else
-            lastLapNumber = 0;
-        }
+      if (resetTriggerState == LOW && !stopwatchRunning) {
+        resetTimer();
       }
     }
   }
 
-  lastLapTriggerState = lapTriggerValue;
+  lastresetTriggerState = resetTriggerValue;
 
   if (stopwatchRunning) {
     if (currentMillis - lastIncrement > delayCount) {
@@ -229,32 +219,40 @@ void startPauseTimer() {
 
 void resetTimer() {
 
+  // if we are in the lap cycle mode we reset the lap times
+  if (enterLapCycle == true) {
+    for (int i = 0; i < noLaps; i++)
+      lapTimes[i] = 0;
+    // if we are in the stopwatch mode we reset the current time
+  } else {
+    currentTime = 0;
+    enterLapCycle = false;
+  }
+}
+
+void saveLap() {
+
+  // save the latest lap and oveeride the last one
   static unsigned long lastInterruptTime = 0;
   unsigned long interruptTime = millis();
-  if (interruptTime - lastInterruptTime > debounceDelay && stopwatchRunning == false) {
 
-    // if we are in the lap cycle mode we reset the lap times
-    if (enterLapCycle == true) {
-      for (int i = 0; i < noLaps; i++)
-        lapTimes[i] = 0;
-    // if we are in the stopwatch mode we reset the current time
-    } else {
-      currentTime = 0;
-      enterLapCycle = false;
+  if (interruptTime - lastInterruptTime > debounceDelay) {
+    if (stopwatchRunning) {
+      if (lastLapNumber < noLaps) {
+        lapTimes[lastLapNumber] = currentTime % 10000;
+        lastLapNumber++;
+      }
+
+      if (lastLapNumber >= noLaps)
+        lastLapNumber = 0;
+    }
+    else {
+      enterLapCycle = true;
+      lastLapNumber++;
+      if (lastLapNumber >= noLaps)
+        lastLapNumber = 0;
     }
   }
 
   lastInterruptTime = interruptTime;
-}
-
-void saveLap(int lapTime) {
-
-  // save the latest lap and oveeride the last one
-  if (lastLapNumber < noLaps) {
-    lapTimes[lastLapNumber] = currentTime % 10000;
-    lastLapNumber++;
-  }
-
-  if (lastLapNumber >= noLaps)
-    lastLapNumber = 0;
 }
