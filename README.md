@@ -58,3 +58,33 @@ Video: https://youtu.be/rTrH3HMgBuk
 <p align = center>
   <img src="Homework_3_7_Segment_Display_Drawing/7segment_drawing.jpg" width = 50%>
 </p>
+
+## Homework #4 - 7 Stopwatch Timer 
+
+The scope of this project is to build a simple stopwatch with the following functionalities:
+  - start/stop the stopwatch
+  - reset the stopwatch
+  - save up to four lap times
+  - view and reset the lap times
+
+A four digit 7 segment display along with a 74HC595N shift register is used to display the timer,
+with a tenth of a second precision
+Three buttons are used to control the stopwatch - start/pause, reset, save/cycle lap time
+
+If the lap button is pressed during the timer counter the lap time is saved. We can only save the last
+lap time, we overwrite the oldest one.
+
+The reset button only works while the timer is paused
+
+In pause mode, the lap button cycles through the saved lap times
+
+Pressing the reset button in lap cycle mode, resets the saved laps.
+Pressing the reset button in timer mode (paused) resets the timer.
+
+Interrupts are used on the start/pause and reset buttons to increase timing precision.
+
+Video: https://youtu.be/jvD5iX-HIFA
+
+<p align = center>
+  <img src="Homework_4_Stopwatch_Timer/stopwatch.jpg" width = 50%>
+</p>
