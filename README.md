@@ -81,7 +81,7 @@ In pause mode, the lap button cycles through the saved lap times.
 Pressing the reset button in lap cycle mode, resets the saved laps.
 Pressing the reset button in timer mode (paused) resets the timer.
 
-Interrupts are used on the start/pause and reset buttons to increase timing precision.
+Interrupts are used on the start/pause and save laps buttons to increase timing precision.
 
 Video: https://youtu.be/jvD5iX-HIFA
 
