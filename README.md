@@ -88,3 +88,57 @@ Video: https://youtu.be/jvD5iX-HIFA
 <p align = center>
   <img src="Homework_4_Stopwatch_Timer/stopwatch.jpg" width = 50%>
 </p>
+
+## Homework #5 - 7 Smart Environment Monitor
+
+This system utilizes various sensors to gather environmental data, log this data into EEPROM,
+and provide both visual feedback via an RGB LED and user interaction through a Serial Menu.
+The project focuses on integrating sensor readings,memory management,
+Serial Communication and the general objective of build-ing a menu.
+
+We use an ultrasonic distance sensor to check if an object is too close and a Light Dependent Resisor
+to measure if the light level is too low.
+
+The main interaction method with the smart environment monitor is the Serial menu.
+
+The Menu structure is the following:
+
+Main Menu
+1. Sensor Settings
+2. Reset Logger Data
+3. System Status
+4. RGB LED Control
+
+With the following submenu options:
+
+Sensor Settings
+1. Sensors Sampling Interval
+2. Ultrasonic Alert Threshold
+3. LDR Alert Threshold
+4. Back
+
+Reset Logger Data
+1. Yes
+2. No
+
+System Status
+1. Current Sensor Readings
+2. Current Sensor Settings
+3. Display Logged Data
+4. Back
+
+RGB LED Control
+1. Manual Color Control
+2. LED: Toggle Automatic ON/OFF
+3. Back
+
+The input from the user is always checked and an error message is shown if the input is invalid
+(ex: choosing an option that doesn't exist)
+
+IMPORTANT: We only use EEPROM put and get to avoid excessive wear.
+
+Video: https://youtu.be/I0WkES3a3BE
+
+<p align = center>
+  <img src="Homework_5_Smart_Environment_Monitor/environment_monitor.jpg" width = 50%>
+</p>
