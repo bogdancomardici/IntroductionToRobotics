@@ -142,3 +142,16 @@ Video: https://youtu.be/I0WkES3a3BE
 <p align = center>
   <img src="Homework_5_Smart_Environment_Monitor/environment_monitor.jpg" width = 50%>
 </p>
+
+## Homework #6 - Mini Matrix Game
+
+The classic bomberman game is simulated on the 8x8 matrix.
+The game has 3 types of elements:  player (blinks slowly), bombs (blinks fast), wall (doesn’tblink).
+A random map is generated each time the game starts. The player moves around using a
+joystick and places bombs that destroy the walls in a plus pattern (like the original bomberman game).
+
+Video: https://youtu.be/NQWItKYPJRQ
+
+<p align = center>
+  <img src="Homework_6_Mini_Matrix_Game/matrix_game.jpg" width = 50%>
+</p>
