@@ -89,7 +89,7 @@ Video: https://youtu.be/jvD5iX-HIFA
   <img src="Homework_4_Stopwatch_Timer/stopwatch.jpg" width = 50%>
 </p>
 
-## Homework #5 - 7 Smart Environment Monitor
+## Homework #5 - Smart Environment Monitor
 
 This system utilizes various sensors to gather environmental data, log this data into EEPROM,
 and provide both visual feedback via an RGB LED and user interaction through a Serial Menu.
