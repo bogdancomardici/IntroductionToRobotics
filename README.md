@@ -59,7 +59,7 @@ Video: https://youtu.be/rTrH3HMgBuk
   <img src="Homework_3_7_Segment_Display_Drawing/7segment_drawing.jpg" width = 50%>
 </p>
 
-## Homework #4 - 7 Stopwatch Timer 
+## Homework #4 - Stopwatch Timer 
 
 The scope of this project is to build a simple stopwatch with the following functionalities:
   - start/stop the stopwatch
