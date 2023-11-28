@@ -9,7 +9,7 @@
     The circuit:
 
       Input:
-        1 x Joystick - used for player movement - pins A0, A1, 7
+        1 x Joystick - used for player movement - pins A0, A1, 13
       
       Output:
         1 x MAX7219 Led matrix driver - pins 10, 11, 12
@@ -31,7 +31,7 @@ const byte driverLoad = 10;   // pin 10 is connected to LOAD pin 12
 
 const byte joystickAxisX = A0;
 const byte joystickAxisY = A1;
-const byte joystickButton = 7;
+const byte joystickButton = 13;
 
 LedControl lc = LedControl(driverDin, driverClock, driverLoad, 1);
 byte matrixBrightness = 2;
