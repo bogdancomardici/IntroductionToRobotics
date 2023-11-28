@@ -59,7 +59,7 @@ Video: https://youtu.be/rTrH3HMgBuk
   <img src="Homework_3_7_Segment_Display_Drawing/7segment_drawing.jpg" width = 50%>
 </p>
 
-## Homework #4 - 7 Stopwatch Timer 
+## Homework #4 - Stopwatch Timer 
 
 The scope of this project is to build a simple stopwatch with the following functionalities:
   - start/stop the stopwatch
@@ -89,7 +89,7 @@ Video: https://youtu.be/jvD5iX-HIFA
   <img src="Homework_4_Stopwatch_Timer/stopwatch.jpg" width = 50%>
 </p>
 
-## Homework #5 - 7 Smart Environment Monitor
+## Homework #5 - Smart Environment Monitor
 
 This system utilizes various sensors to gather environmental data, log this data into EEPROM,
 and provide both visual feedback via an RGB LED and user interaction through a Serial Menu.
