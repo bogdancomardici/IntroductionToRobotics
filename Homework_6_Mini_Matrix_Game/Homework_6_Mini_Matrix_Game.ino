@@ -2,9 +2,14 @@
     Mini Matrix Game (Bomberman)
 
     The classic bomberman game is simulated on the 8x8 matrix.
+    Various stats and game information are shown on a LCD Display (player status, welcome and
+    end game messages, etc...)
     The game has 3 types of elements:  player (blinks slowly), bombs (blinks fast), wall (doesn’tblink).
     A random map is generated each time the game starts. The player moves around using a
     joystick and places bombs that destroy the walls in a plus pattern (like the original bomberman game).
+    Every game is timed and the score is calculated by how fast the player destroys all the walls,
+    the player has 3 lives that he can lose when positioned in the blast radius of a bomb when detonating.
+
 
     The circuit:
 
@@ -17,6 +22,8 @@
         1 x 10uF capacitor to reduce power spikes when the matrix is fully on
         1 x 0.1uF capacitor to filter the noise on 5V
         1 x 10K resitor for the ISET pin on the matrix driver
+        1 x LCD Display for displaying various info - pins 4, 5, 6, 7, 8, 9
+        1 x 50K Resistors to adjust LCD Contrast
 
     Created 24.11.2023
     By Comardici Marian Bogdan
@@ -25,6 +32,8 @@
 */
 
 #include "LedControl.h"
+#include <LiquidCrystal.h>
+
 const byte driverDin = 12;    // pin 12 is connected to the MAX7219 pin 1
 const byte driverClock = 11;  // pin 11 is connected to the CLK pin 13
 const byte driverLoad = 10;   // pin 10 is connected to LOAD pin 12
@@ -32,6 +41,15 @@ const byte driverLoad = 10;   // pin 10 is connected to LOAD pin 12
 const byte joystickAxisX = A0;
 const byte joystickAxisY = A1;
 const byte joystickButton = 13;
+
+// LCD pins
+const byte lcdRs = 9;
+const byte lcdEn = 8;
+const byte lcdD4 = 7;
+const byte lcdD5 = 6;
+const byte lcdD6 = 5;
+const byte lcdD7 = 4;
+LiquidCrystal lcd(lcdRs, lcdEn, lcdD4, lcdD5, lcdD6, lcdD7);
 
 LedControl lc = LedControl(driverDin, driverClock, driverLoad, 1);
 byte matrixBrightness = 2;
@@ -71,6 +89,17 @@ byte joyButtonState = 0;
 byte joyButtonReading = 0;
 unsigned long lastJoyPress = 0;
 
+bool inGame = false;
+byte menuPosition = 1;
+byte previousMenuPosition = 0;
+
+byte noLives = 3;
+byte previousLives = 3;
+
+unsigned long playTime = 0;
+unsigned long currentMillis = 0;
+unsigned long previousMillis = 0;
+
 byte mapMatrix[matrixSize][matrixSize] = {
   { 0, 0, 0, 0, 0, 0, 0, 0 },
   { 0, 0, 0, 0, 0, 0, 0, 0 },
@@ -80,6 +109,50 @@ byte mapMatrix[matrixSize][matrixSize] = {
   { 0, 0, 0, 0, 0, 0, 0, 0 },
   { 0, 0, 0, 0, 0, 0, 0, 0 },
   { 0, 0, 0, 0, 0, 0, 0, 0 },
+};
+
+byte arrowDownChar[8] = {
+  0b00000,
+  0b00000,
+  0b00000,
+  0b00000,
+  0b00000,
+  0b11111,
+  0b01110,
+  0b00100
+};
+
+byte arrowUpAndDownChar[8] = {
+  0b00100,
+  0b01110,
+  0b11111,
+  0b00000,
+  0b00000,
+  0b11111,
+  0b01110,
+  0b00100
+};
+
+byte arrowUpChar[8] = {
+  0b00100,
+  0b01110,
+  0b11111,
+  0b00000,
+  0b00000,
+  0b00000,
+  0b00000,
+  0b00000
+};
+
+byte heartChar[8] = {
+  0b00000,
+  0b00000,
+  0b01010,
+  0b11111,
+  0b01110,
+  0b00100,
+  0b00000,
+  0b00000
 };
 
 void setup() {
@@ -96,6 +169,13 @@ void setup() {
   pinMode(driverClock, OUTPUT);
   pinMode(driverLoad, OUTPUT);
 
+  // initialize the LCD
+  lcd.createChar(0, arrowDownChar);
+  lcd.createChar(1, arrowUpAndDownChar);
+  lcd.createChar(2, arrowDownChar);
+  lcd.createChar(3, heartChar);
+  lcd.begin(16, 2);
+  welcomeMessage();
   // analog input pin 0 is unconnected, random analog
   // noise will cause the call to randomSeed() to generate
   // different seed numbers each time the sketch runs.
@@ -111,38 +191,72 @@ void loop() {
   joyButtonReading = digitalRead(joystickButton);
 
   joyButtonState = debounceInput(joystickButton, &joyButtonReading, &lastJoyPress, debounceDelay);
-
-  if (joyButtonState) {
-    placeBomb(playerX, playerY);
-  }
-
   currentMovement = joyDirection(xAxisValue, yAxisValue, minJoyThreshold, maxJoyThreshold, &joyMoved);
 
-  if (currentMovement != previousMovement) {
-    movePlayer(currentMovement);
-    previousMovement = currentMovement;
-    renderMap();
-  }
+  if (inGame) {
 
-  if (millis() - lastPlayerBlink > playerBlinkInterval) {
-    playerBlinkState = !playerBlinkState;
-    lastPlayerBlink = millis();
-  }
+    currentMillis = millis();
 
-  // we render the bomb only when one is placed
-  if (bombPlaced && (millis() - lastBombBlink > bombBlinkInterval)) {
-    bombBlinkState = !bombBlinkState;
-    lastBombBlink = millis();
-    renderBomb();
-  }
+    if (currentMillis - previousMillis > 1000) {  // count seconds
+      playTime++;
+      playTime %= 1000;
+      previousMillis = millis();
+      printGameStats(noLives, playTime);
+    }
 
-  // we render the map only when a change to the walls happens
-  if (bombPlaced && (millis() - bombPlacedTime > bombTimer)) {
-    detonateBomb();
-    renderMap();
-  }
+    if (noLives != previousLives) {
+      printGameStats(noLives, playTime);
+      previousLives = noLives;
+    }
 
-  renderPlayer();
+    if (joyButtonState) {
+      placeBomb(playerX, playerY);
+    }
+
+    if (currentMovement != previousMovement) {
+      movePlayer(currentMovement);
+      previousMovement = currentMovement;
+      renderMap();
+    }
+
+    if (millis() - lastPlayerBlink > playerBlinkInterval) {
+      playerBlinkState = !playerBlinkState;
+      lastPlayerBlink = millis();
+    }
+
+    // we render the bomb only when one is placed
+    if (bombPlaced && (millis() - lastBombBlink > bombBlinkInterval)) {
+      bombBlinkState = !bombBlinkState;
+      lastBombBlink = millis();
+      renderBomb();
+    }
+
+    // we render the map only when a change to the walls happens
+    if (bombPlaced && (millis() - bombPlacedTime > bombTimer)) {
+      detonateBomb();
+      renderMap();
+    }
+
+    renderPlayer();
+  } else {
+    if (currentMovement != previousMovement) {
+      if (currentMovement == 1 && menuPosition < 3) {
+        menuPosition++;
+      } else if (currentMovement == 0 && menuPosition > 1) {
+        menuPosition--;
+      }
+
+      if (menuPosition != previousMenuPosition) {
+        printMenu(menuPosition);
+        previousMenuPosition = menuPosition;
+      }
+      previousMovement = currentMovement;
+    }
+
+    if (joyButtonState) {
+      menuActions(menuPosition);
+    }
+  }
 }
 
 // generate map in a random manner
@@ -197,7 +311,11 @@ void detonateBomb() {
 
     if (bombY + 1 < matrixSize)
       mapMatrix[bombX][bombY + 1] = 0;
+
+    if(playerX == bombX && playerY == bombY)
+      noLives--;
   }
+
   bombPlaced = false;
   bombX = 9;
   bombY = 9;
@@ -281,4 +399,65 @@ bool debounceInput(int pin, byte *lastReading, unsigned long *lastDebounceTime, 
 
   *lastReading = reading;
   return pressed;
+}
+
+void welcomeMessage() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.write("## WELCOME TO ###");
+  lcd.setCursor(0, 1);
+  lcd.write("## BOMBERMAN! ##");
+  delay(3000);
+  lcd.clear();
+}
+
+void printMenu(byte menuOption) {
+  switch (menuOption) {
+    case 1:
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.write("Start Game     ");
+      lcd.write((uint8_t)0);
+      break;
+    case 2:
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.write("Settings       ");
+      lcd.write((uint8_t)1);
+      break;
+    case 3:
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.write("About          ");
+      lcd.write((uint8_t)2);
+      break;
+    default:
+      break;
+  }
+}
+
+void menuActions(byte menuOption) {
+  switch (menuOption) {
+    case 1:
+      inGame = true;
+      renderMap();
+      break;
+    case 2:
+      break;
+    case 3:
+      break;
+    default:
+      break;
+  }
+}
+
+void printGameStats(byte noLives, unsigned long playTime) {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  for (int i = 0; i < noLives; i++)
+    lcd.write((uint8_t)3);
+  lcd.setCursor(0, 1);
+  lcd.write("Play time: ");
+  char playTimeChar[4];
+  lcd.write(itoa(playTime, playTimeChar, 10));
 }
