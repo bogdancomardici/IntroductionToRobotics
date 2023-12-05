@@ -49,6 +49,10 @@ const byte lcdD4 = 7;
 const byte lcdD5 = 6;
 const byte lcdD6 = 5;
 const byte lcdD7 = 4;
+
+const byte buzzerPin = 2;
+const int bombTone = 700;
+
 LiquidCrystal lcd(lcdRs, lcdEn, lcdD4, lcdD5, lcdD6, lcdD7);
 
 LedControl lc = LedControl(driverDin, driverClock, driverLoad, 1);
@@ -84,7 +88,7 @@ byte bombBlinkState = 0;
 const int bombBlinkInterval = 100;  // 0.1 seconds
 unsigned long lastBombBlink = 0;
 
-byte debounceDelay = 100;
+byte debounceDelay = 50;
 byte joyButtonState = 0;
 byte joyButtonReading = 0;
 unsigned long lastJoyPress = 0;
@@ -99,6 +103,11 @@ byte previousLives = 3;
 unsigned long playTime = 0;
 unsigned long currentMillis = 0;
 unsigned long previousMillis = 0;
+
+bool inAbout = false;
+
+String aboutString = " Bomberman by Bogdan Comardici - github.com/bogdancomardici";
+int aboutStringPos = 0;
 
 byte mapMatrix[matrixSize][matrixSize] = {
   { 0, 0, 0, 0, 0, 0, 0, 0 },
@@ -169,6 +178,15 @@ void setup() {
   pinMode(driverClock, OUTPUT);
   pinMode(driverLoad, OUTPUT);
 
+  pinMode(buzzerPin, OUTPUT);
+
+  pinMode(lcdRs, OUTPUT);
+  pinMode(lcdEn, OUTPUT);
+  pinMode(lcdD4, OUTPUT);
+  pinMode(lcdD5, OUTPUT);
+  pinMode(lcdD6, OUTPUT);
+  pinMode(lcdD7, OUTPUT);
+
   // initialize the LCD
   lcd.createChar(0, arrowDownChar);
   lcd.createChar(1, arrowUpAndDownChar);
@@ -182,6 +200,8 @@ void setup() {
   randomSeed(analogRead(0));
 
   generateMap();
+
+  Serial.begin(9600);
 }
 void loop() {
 
@@ -231,6 +251,12 @@ void loop() {
       renderBomb();
     }
 
+    if (bombBlinkState) {
+      tone(buzzerPin, bombTone);
+    } else {
+      noTone(buzzerPin);
+    }
+
     // we render the map only when a change to the walls happens
     if (bombPlaced && (millis() - bombPlacedTime > bombTimer)) {
       detonateBomb();
@@ -238,6 +264,24 @@ void loop() {
     }
 
     renderPlayer();
+  } else if (inAbout) {
+    if (currentMovement == 2) {
+      inAbout = false;
+      lcd.clear();
+      printMenu(menuPosition);
+    } else {
+      lcd.setCursor(0, 1);
+      if (millis() - previousMillis > 400) {
+        previousMillis = millis();
+        lcd.clear();
+        for (int i = aboutStringPos; i <= aboutStringPos + 16; i++)
+          lcd.print(aboutString[i]);
+        aboutStringPos++;
+        if (aboutStringPos > 56 - 16) // wrap string
+          aboutStringPos = 0;
+        lcd.scrollDisplayLeft();
+      }
+    }
   } else {
     if (currentMovement != previousMovement) {
       if (currentMovement == 1 && menuPosition < 3) {
@@ -253,7 +297,7 @@ void loop() {
       previousMovement = currentMovement;
     }
 
-    if (joyButtonState) {
+    if (currentMovement == 3) {
       menuActions(menuPosition);
     }
   }
@@ -312,8 +356,17 @@ void detonateBomb() {
     if (bombY + 1 < matrixSize)
       mapMatrix[bombX][bombY + 1] = 0;
 
-    if(playerX == bombX && playerY == bombY)
-      noLives--;
+    // check if player is in blast radius
+    for (int blastRadius = -1; blastRadius <= 1; blastRadius++) {
+      if (playerX == bombX + blastRadius && playerY == bombY) {
+        noLives--;
+        break;
+      }
+      if (playerY == bombY + blastRadius && playerX == bombX) {
+        noLives--;
+        break;
+      }
+    }
   }
 
   bombPlaced = false;
@@ -445,6 +498,8 @@ void menuActions(byte menuOption) {
     case 2:
       break;
     case 3:
+      inAbout = true;
+      printAbout();
       break;
     default:
       break;
@@ -460,4 +515,12 @@ void printGameStats(byte noLives, unsigned long playTime) {
   lcd.write("Play time: ");
   char playTimeChar[4];
   lcd.write(itoa(playTime, playTimeChar, 10));
+}
+
+void printAbout() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print(" Bomberman:");
+  lcd.setCursor(0, 1);
+  lcd.print(" Created by Bogdan Comardici");
 }
