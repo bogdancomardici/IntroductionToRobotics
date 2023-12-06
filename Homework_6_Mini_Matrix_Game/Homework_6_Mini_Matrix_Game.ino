@@ -33,6 +33,7 @@
 
 #include "LedControl.h"
 #include <LiquidCrystal.h>
+#include <EEPROM.h>
 
 const byte driverDin = 12;    // pin 12 is connected to the MAX7219 pin 1
 const byte driverClock = 11;  // pin 11 is connected to the CLK pin 13
@@ -49,7 +50,8 @@ const byte lcdD4 = 7;
 const byte lcdD5 = 6;
 const byte lcdD6 = 5;
 const byte lcdD7 = 4;
-
+const byte lcdBacklight = 3;
+int lcdBrightness = 255;
 const byte buzzerPin = 2;
 const int bombTone = 700;
 
@@ -58,6 +60,7 @@ LiquidCrystal lcd(lcdRs, lcdEn, lcdD4, lcdD5, lcdD6, lcdD7);
 LedControl lc = LedControl(driverDin, driverClock, driverLoad, 1);
 byte matrixBrightness = 2;
 const byte matrixSize = 8;
+byte previousMatrixBrightness = 2;
 
 const int playerBlinkInterval = 600;  // 0.6 seconds
 unsigned long lastPlayerBlink = 0;
@@ -109,6 +112,13 @@ bool inAbout = false;
 String aboutString = " Bomberman by Bogdan Comardici - github.com/bogdancomardici";
 int aboutStringPos = 0;
 
+bool inSettings = false;
+byte settingsPosition = 1;
+byte previousSettingsPosition = 0;
+
+bool inSettingsInput = false;
+byte settingsInput = 0;
+
 byte mapMatrix[matrixSize][matrixSize] = {
   { 0, 0, 0, 0, 0, 0, 0, 0 },
   { 0, 0, 0, 0, 0, 0, 0, 0 },
@@ -153,6 +163,28 @@ byte arrowUpChar[8] = {
   0b00000
 };
 
+byte arrowLeftChar[8] = {
+  0b00000,
+  0b00000,
+  0b00100,
+  0b01100,
+  0b11100,
+  0b01100,
+  0b00100,
+  0b00000
+};
+
+byte arrowRightChar[8] = {
+  0b00000,
+  0b00000,
+  0b00100,
+  0b00110,
+  0b00111,
+  0b00110,
+  0b00100,
+  0b00000,
+};
+
 byte heartChar[8] = {
   0b00000,
   0b00000,
@@ -166,8 +198,15 @@ byte heartChar[8] = {
 
 void setup() {
 
-  lc.shutdown(0, false);
+  // read data from eeprom;
+  EEPROM.get(0, lcdBrightness);
+  EEPROM.get(sizeof(int), matrixBrightness);
+
+  // set lcd and matrix brightness
   lc.setIntensity(0, matrixBrightness);
+  analogWrite(lcdBacklight, lcdBrightness);
+
+  lc.shutdown(0, false);
   lc.clearDisplay(0);
 
   pinMode(joystickAxisX, INPUT);
@@ -186,12 +225,15 @@ void setup() {
   pinMode(lcdD5, OUTPUT);
   pinMode(lcdD6, OUTPUT);
   pinMode(lcdD7, OUTPUT);
+  pinMode(lcdBacklight, OUTPUT);
 
   // initialize the LCD
   lcd.createChar(0, arrowDownChar);
   lcd.createChar(1, arrowUpAndDownChar);
-  lcd.createChar(2, arrowDownChar);
+  lcd.createChar(2, arrowUpChar);
   lcd.createChar(3, heartChar);
+  lcd.createChar(4, arrowLeftChar);
+  lcd.createChar(5, arrowRightChar);
   lcd.begin(16, 2);
   welcomeMessage();
   // analog input pin 0 is unconnected, random analog
@@ -270,17 +312,78 @@ void loop() {
       lcd.clear();
       printMenu(menuPosition);
     } else {
-      lcd.setCursor(0, 1);
+
+
       if (millis() - previousMillis > 400) {
         previousMillis = millis();
         lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.write(" ");  // to ignore scroll
+        lcd.write((uint8_t)4);
+        lcd.write("Back");
+        lcd.setCursor(0, 1);
         for (int i = aboutStringPos; i <= aboutStringPos + 16; i++)
           lcd.print(aboutString[i]);
         aboutStringPos++;
-        if (aboutStringPos > 56 - 16) // wrap string
+        if (aboutStringPos > 56 - 16)  // wrap string
           aboutStringPos = 0;
         lcd.scrollDisplayLeft();
       }
+    }
+  } else if (inSettings) {
+    if (currentMovement != previousMovement) {
+      Serial.println(currentMovement);
+      if (currentMovement == 2) {
+        lcd.clear();
+        printMenu(menuPosition);
+        inSettings = false;
+        inSettingsInput = false;
+        inAbout = false;
+      }
+      else if (currentMovement == 3) {
+        lcd.clear();
+        printSettingsInput(settingsPosition);
+        inSettingsInput = true;
+        inSettings = false;
+        inAbout = false;
+      }
+      if (currentMovement == 1 && settingsPosition < 2) {
+        settingsPosition++;
+      } else if (currentMovement == 0 && settingsPosition > 1) {
+        settingsPosition--;
+      }
+
+      if (settingsPosition != previousSettingsPosition) {
+        printSettings(settingsPosition);
+        previousSettingsPosition = settingsPosition;
+      }
+      previousMovement = currentMovement;
+    }
+  } else if (inSettingsInput) {
+    if (currentMovement == 2) {
+      inSettingsInput = false;
+      inAbout = false;
+      inSettings = true;
+      lcd.clear();
+      printSettings(menuPosition);
+      EEPROM.put(0, lcdBrightness);
+      EEPROM.put(sizeof(int), matrixBrightness);
+    }
+    if (currentMovement != previousMovement) {
+      if (settingsPosition == 2) {
+        if (currentMovement == 0 && matrixBrightness < 15) {
+          matrixBrightness++;
+        } else if (currentMovement == 1 && matrixBrightness > 2) {
+          matrixBrightness--;
+        }
+
+        if (matrixBrightness != previousMatrixBrightness) {
+          printSettingsInput(settingsPosition);
+          previousMatrixBrightness = matrixBrightness;
+          lc.setIntensity(0, matrixBrightness);
+        }
+      }
+      previousMovement = currentMovement;
     }
   } else {
     if (currentMovement != previousMovement) {
@@ -469,19 +572,25 @@ void printMenu(byte menuOption) {
     case 1:
       lcd.clear();
       lcd.setCursor(0, 0);
-      lcd.write("Start Game     ");
+      lcd.write("Start Game");
+      lcd.write((uint8_t)5);
+      lcd.write("    ");
       lcd.write((uint8_t)0);
       break;
     case 2:
       lcd.clear();
       lcd.setCursor(0, 0);
-      lcd.write("Settings       ");
+      lcd.write("Settings");
+      lcd.write((uint8_t)5);
+      lcd.write("      ");
       lcd.write((uint8_t)1);
       break;
     case 3:
       lcd.clear();
       lcd.setCursor(0, 0);
-      lcd.write("About          ");
+      lcd.write("About");
+      lcd.write((uint8_t)5);
+      lcd.write("         ");
       lcd.write((uint8_t)2);
       break;
     default:
@@ -489,6 +598,57 @@ void printMenu(byte menuOption) {
   }
 }
 
+void printSettings(byte settingsOption) {
+
+  switch (settingsOption) {
+    case 1:
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.write((uint8_t)4);
+      lcd.write("Back          ");
+      lcd.write((uint8_t)0);
+      lcd.setCursor(0, 1);
+      lcd.write("LCD Brightness");
+      lcd.write((uint8_t)5);
+      break;
+    case 2:
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.write((uint8_t)4);
+      lcd.write("Back   Matrix ");
+      lcd.write((uint8_t)2);
+      lcd.setCursor(0, 1);
+      lcd.write("    Brightness");
+      lcd.write((uint8_t)5);
+      break;
+    default:
+      break;
+  }
+}
+
+void printSettingsInput(byte settingsOption) {
+  switch (settingsOption) {
+    case 1:
+      break;
+    case 2:
+      lcd.clear();
+      lcd.write((uint8_t)4);
+      lcd.write("Back");
+      lcd.setCursor(0, 1);
+      lcd.write("Brightness: ");
+      char matrixBrightnessChar[2];
+      lcd.write(itoa(matrixBrightness, matrixBrightnessChar, 10));
+      if(matrixBrightness == 2)
+        lcd.write((uint8_t)2);
+      else if(matrixBrightness == 15)
+        lcd.write((uint8_t)0);
+      else 
+        lcd.write((uint8_t)1);
+      break;
+    default:
+      break;
+  }
+}
 void menuActions(byte menuOption) {
   switch (menuOption) {
     case 1:
@@ -496,10 +656,12 @@ void menuActions(byte menuOption) {
       renderMap();
       break;
     case 2:
+      inSettings = true;
+      lcd.clear();
+      printSettings(settingsPosition);
       break;
     case 3:
       inAbout = true;
-      printAbout();
       break;
     default:
       break;
@@ -515,12 +677,4 @@ void printGameStats(byte noLives, unsigned long playTime) {
   lcd.write("Play time: ");
   char playTimeChar[4];
   lcd.write(itoa(playTime, playTimeChar, 10));
-}
-
-void printAbout() {
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print(" Bomberman:");
-  lcd.setCursor(0, 1);
-  lcd.print(" Created by Bogdan Comardici");
 }
