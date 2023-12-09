@@ -44,13 +44,13 @@ const byte joystickAxisY = A1;
 const byte joystickButton = 13;
 
 // LCD pins
-const byte lcdRs = 9;
+const byte lcdRs = 3;
 const byte lcdEn = 8;
 const byte lcdD4 = 7;
 const byte lcdD5 = 6;
 const byte lcdD6 = 5;
 const byte lcdD7 = 4;
-const byte lcdBacklight = 3;
+const byte lcdBacklight = 9;
 const byte buzzerPin = 2;
 
 const int bombTone = 700;
@@ -120,6 +120,8 @@ byte previousSettingsPosition = 0;
 
 bool inSettingsInput = false;
 byte settingsInput = 0;
+
+bool inEndGameScreen = false;
 
 byte mapMatrix[matrixSize][matrixSize] = {
   { 0, 0, 0, 0, 0, 0, 0, 0 },
@@ -312,22 +314,15 @@ void loop() {
       // reset game
       if (playerWin()) {
         printWin();
-        delay(3000);
+        inEndGameScreen = true;
+        inGame = false;
       }
 
       else if (playerDead()) {
         printGameOver();
-        delay(3000);
+        inEndGameScreen = true;
+        inGame = false;
       }
-      inGame = false;
-      generateMap();
-      lcd.clear();
-      playerX = 3;
-      playerY = 3;
-      noLives = 3;
-      playTime = 0;
-
-      printMenu(1);
     }
   } else if (inAbout) {
     if (currentMovement == 2) {
@@ -417,6 +412,12 @@ void loop() {
       }
       previousMovement = currentMovement;
     }
+  } else if (inEndGameScreen) {
+    if (currentMovement != previousMovement) {
+      inEndGameScreen = false;
+      resetGame();
+    }
+    previousMovement = currentMovement;
   } else {
     if (currentMovement != previousMovement) {
       if (currentMovement == 1 && menuPosition < 3) {
@@ -743,14 +744,25 @@ bool playerWin() {
 void printGameOver() {
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.write("##### GAME #####");
+  lcd.write("## GAME OVER! ##");
   lcd.setCursor(0, 1);
-  lcd.write("##### OVER #####");
+  lcd.write("MOVE TO CONTINUE");
 }
 void printWin() {
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.write("##### YOU  #####");
+  lcd.write("### YOU WIN! ###");
   lcd.setCursor(0, 1);
-  lcd.write("#####  WIN #####");
+  lcd.write("MOVE TO CONTINUE");
+}
+
+void resetGame() {
+  inGame = false;
+  generateMap();
+  lcd.clear();
+  playerX = 3;
+  playerY = 3;
+  noLives = 3;
+  playTime = 0;
+  printMenu(menuPosition);
 }
