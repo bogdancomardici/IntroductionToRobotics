@@ -123,6 +123,8 @@ byte settingsInput = 0;
 
 bool inEndGameScreen = false;
 
+bool inMenu = true;
+
 byte mapMatrix[matrixSize][matrixSize] = {
   { 0, 0, 0, 0, 0, 0, 0, 0 },
   { 0, 0, 0, 0, 0, 0, 0, 0 },
@@ -316,17 +318,20 @@ void loop() {
         printWin();
         inEndGameScreen = true;
         inGame = false;
+        inMenu = false;
       }
 
       else if (playerDead()) {
         printGameOver();
         inEndGameScreen = true;
         inGame = false;
+        inMenu = false;
       }
     }
   } else if (inAbout) {
     if (currentMovement == 2) {
       inAbout = false;
+      inMenu = true;
       lcd.clear();
       printMenu(menuPosition);
     } else {
@@ -355,6 +360,7 @@ void loop() {
         inSettings = false;
         inSettingsInput = false;
         inAbout = false;
+        inMenu = true;
       } else if (currentMovement == 3) {
         lcd.clear();
         printSettingsInput(settingsPosition);
@@ -379,6 +385,7 @@ void loop() {
       inSettingsInput = false;
       inAbout = false;
       inSettings = true;
+      inMenu = false;
       lcd.clear();
       printSettings(menuPosition);
       EEPROM.put(0, lcdBrightness);
@@ -412,13 +419,7 @@ void loop() {
       }
       previousMovement = currentMovement;
     }
-  } else if (inEndGameScreen) {
-    if (currentMovement != previousMovement) {
-      inEndGameScreen = false;
-      resetGame();
-    }
-    previousMovement = currentMovement;
-  } else {
+  } else if (inMenu) {
     if (currentMovement != previousMovement) {
       if (currentMovement == 1 && menuPosition < 3) {
         menuPosition++;
@@ -436,6 +437,12 @@ void loop() {
     if (currentMovement == 3) {
       menuActions(menuPosition);
     }
+  } else if (inEndGameScreen) {
+    if (currentMovement != previousMovement) {
+      inEndGameScreen = false;
+      resetGame();
+    }
+    previousMovement = currentMovement;
   }
 }
 
@@ -700,15 +707,18 @@ void menuActions(byte menuOption) {
   switch (menuOption) {
     case 1:
       inGame = true;
+      inMenu = false;
       renderMap();
       break;
     case 2:
       inSettings = true;
+      inMenu = false;
       lcd.clear();
       printSettings(settingsPosition);
       break;
     case 3:
       inAbout = true;
+      inMenu = false;
       break;
     default:
       break;
@@ -746,18 +756,23 @@ void printGameOver() {
   lcd.setCursor(0, 0);
   lcd.write("## GAME OVER! ##");
   lcd.setCursor(0, 1);
-  lcd.write("MOVE TO CONTINUE");
+  lcd.write((uint8_t)4);
+  lcd.write("EXIT   RESTART");
+  lcd.write((uint8_t)5);
 }
 void printWin() {
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.write("### YOU WIN! ###");
   lcd.setCursor(0, 1);
-  lcd.write("MOVE TO CONTINUE");
+  lcd.write((uint8_t)4);
+  lcd.write("EXIT   RESTART");
+  lcd.write((uint8_t)5);
 }
 
 void resetGame() {
   inGame = false;
+  inMenu = true;
   generateMap();
   lcd.clear();
   playerX = 3;
