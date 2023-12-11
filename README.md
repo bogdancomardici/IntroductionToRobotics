@@ -155,3 +155,31 @@ Video: https://youtu.be/NQWItKYPJRQ
 <p align = center>
   <img src="Homework_6_Mini_Matrix_Game/matrix_game.jpg" width = 50%>
 </p>
+
+## Homework #7 - Matrix Game Checkpoint
+
+The classic bomberman game is simulated on the 8x8 matrix.
+Various stats and game information are shown on a LCD Display (player status, welcome and
+end game messages, number of lives left, etc...)
+The game has 3 types of elements:  player (blinks slowly), bombs (blinks fast), wall (doesn’t blink).
+A random map is generated each time the game starts. The player moves around using a
+joystick and places bombs that destroy the walls in a plus pattern (like the original bomberman game).
+Every game is timed and the score is calculated by how fast the player destroys all the walls,
+the player has 3 lives that he can lose when positioned in the blast radius of a bomb when detonating.
+The game has an interactive menu with a different sections such as: about - details about the game and it's 
+creator, settings (change lcd brightness, matrix brightness, etc...).
+Sound effects such as the bomb timer are provided by a buzzer.
+
+Menu structure:
+
+    1. Start game
+    2. Settings
+      2.1. LCD brightness control
+      2.2. Matrix brightness control
+    3. About
+
+Video: https://youtu.be/_lOsGxpBIbo
+
+<p align = center>
+  <img src="Homework_7_Matrix_Game_Checkpoint/matrix.jpeg" width = 50%>
+</p>
