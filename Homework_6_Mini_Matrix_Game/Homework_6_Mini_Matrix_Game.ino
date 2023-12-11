@@ -3,12 +3,15 @@
 
     The classic bomberman game is simulated on the 8x8 matrix.
     Various stats and game information are shown on a LCD Display (player status, welcome and
-    end game messages, etc...)
-    The game has 3 types of elements:  player (blinks slowly), bombs (blinks fast), wall (doesn’tblink).
+    end game messages, number of lives left, etc...)
+    The game has 3 types of elements:  player (blinks slowly), bombs (blinks fast), wall (doesn’t blink).
     A random map is generated each time the game starts. The player moves around using a
     joystick and places bombs that destroy the walls in a plus pattern (like the original bomberman game).
     Every game is timed and the score is calculated by how fast the player destroys all the walls,
     the player has 3 lives that he can lose when positioned in the blast radius of a bomb when detonating.
+    The game has an interactive menu with a different sections such as: about - details about the game and it's 
+    creator), settings (change lcd brightness, matrix brightness, etc...).
+    Sound effects such as the bomb timer are provided by a buzzer.
 
 
     The circuit:
@@ -22,8 +25,16 @@
         1 x 10uF capacitor to reduce power spikes when the matrix is fully on
         1 x 0.1uF capacitor to filter the noise on 5V
         1 x 10K resitor for the ISET pin on the matrix driver
-        1 x LCD Display for displaying various info - pins 4, 5, 6, 7, 8, 9
+        1 x LCD Display for displaying various info - pins 3, 4, 5, 6, 7, 8, 9
         1 x 50K Resistors to adjust LCD Contrast
+
+    Menu structure:
+
+    1. Start game
+    2. Settings
+      2.1. LCD brightness control
+      2.2. Matrix brightness control
+    3. About
 
     Created 24.11.2023
     By Comardici Marian Bogdan
@@ -58,6 +69,8 @@ const int bombTone = 700;
 LiquidCrystal lcd(lcdRs, lcdEn, lcdD4, lcdD5, lcdD6, lcdD7);
 byte lcdBrightness = 10;
 byte previousLcdBrightness = 10;
+byte lcdLineWidth = 16;
+int lcdScrollInterval = 400;
 
 LedControl lc = LedControl(driverDin, driverClock, driverLoad, 1);
 const byte matrixSize = 8;
@@ -113,6 +126,8 @@ bool inAbout = false;
 
 String aboutString = " Bomberman by Bogdan Comardici - github.com/bogdancomardici";
 byte aboutStringPos = 0;
+byte aboutStringLen = 56;
+
 
 bool inSettings = false;
 byte settingsPosition = 1;
@@ -242,10 +257,10 @@ void setup() {
   lcd.createChar(5, arrowRightChar);
   lcd.begin(16, 2);
   welcomeMessage();
-  // analog input pin 0 is unconnected, random analog
+  // analog input pin 3 is unconnected, random analog
   // noise will cause the call to randomSeed() to generate
   // different seed numbers each time the sketch runs.
-  randomSeed(analogRead(0));
+  randomSeed(analogRead(A3));
 
   generateMap();
 
@@ -335,7 +350,7 @@ void loop() {
       lcd.clear();
       printMenu(menuPosition);
     } else {
-      if (millis() - previousMillis > 400) {
+      if (millis() - previousMillis > lcdScrollInterval) {
         previousMillis = millis();
         lcd.clear();
         lcd.setCursor(0, 0);
@@ -343,10 +358,10 @@ void loop() {
         lcd.write((uint8_t)4);
         lcd.write("Back");
         lcd.setCursor(0, 1);
-        for (byte i = aboutStringPos; i <= aboutStringPos + 16; i++)
+        for (byte i = aboutStringPos; i <= aboutStringPos + lcdLineWidth; i++)
           lcd.print(aboutString[i]);
         aboutStringPos++;
-        if (aboutStringPos > 56 - 16)  // wrap string
+        if (aboutStringPos > aboutStringLen - lcdLineWidth)  // wrap string
           aboutStringPos = 0;
         lcd.scrollDisplayLeft();
       }
