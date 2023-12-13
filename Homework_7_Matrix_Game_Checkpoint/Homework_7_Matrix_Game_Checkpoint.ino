@@ -34,6 +34,8 @@
     2. Settings
       2.1. LCD brightness control
       2.2. Matrix brightness control
+      2.3. Sounds - ON / OFF
+      2.4. Player Name
     3. About
 
     Created 24.11.2023
@@ -140,6 +142,16 @@ bool inEndGameScreen = false;
 
 bool inMenu = true;
 
+bool soundOn = false;
+bool previousSoundState = false;
+
+char playerName[3] = "XXX";
+char previousName[3] = "YYY";
+byte namePosition = 0;
+
+int score = 0;
+byte difficulty = 1;
+
 byte mapMatrix[matrixSize][matrixSize] = {
   { 0, 0, 0, 0, 0, 0, 0, 0 },
   { 0, 0, 0, 0, 0, 0, 0, 0 },
@@ -243,7 +255,8 @@ void setup() {
   // read data from eeprom;
   EEPROM.get(0, lcdBrightness);
   EEPROM.get(sizeof(byte), matrixBrightness);
-
+  EEPROM.get(2 * sizeof(byte), soundOn);
+  EEPROM.get(2 * sizeof(byte) + sizeof(bool), playerName);
   // set lcd and matrix brightness
   lc.setIntensity(0, matrixBrightness);
   analogWrite(lcdBacklight, lcdBrightness * 25);
@@ -313,7 +326,7 @@ void loop() {
       renderBomb();
     }
 
-    if (bombBlinkState) {
+    if (bombBlinkState && soundOn) {
       tone(buzzerPin, bombTone);
     } else {
       noTone(buzzerPin);
@@ -383,7 +396,7 @@ void loop() {
         inSettings = false;
         inAbout = false;
       }
-      if (currentMovement == 1 && settingsPosition < 2) {
+      if (currentMovement == 1 && settingsPosition < 4) {
         settingsPosition++;
       } else if (currentMovement == 0 && settingsPosition > 1) {
         settingsPosition--;
@@ -396,18 +409,34 @@ void loop() {
       previousMovement = currentMovement;
     }
   } else if (inSettingsInput) {
-    if (currentMovement == 2) {
+    if (currentMovement == 2 && settingsPosition != 4) {
       inSettingsInput = false;
       inAbout = false;
       inSettings = true;
       inMenu = false;
       lcd.clear();
-      printSettings(menuPosition);
+      Serial.println("Settings Position");
+      Serial.println(settingsPosition);
+      printSettings(settingsPosition);
       EEPROM.put(0, lcdBrightness);
       EEPROM.put(sizeof(byte), matrixBrightness);
+      EEPROM.put(2 * sizeof(byte), soundOn);
+      EEPROM.put(2 * sizeof(byte) + sizeof(bool), playerName);
     }
     if (currentMovement != previousMovement) {
-      if (settingsPosition == 2) {
+      if (settingsPosition == 1) {
+        if (currentMovement == 0 && lcdBrightness < 10) {
+          lcdBrightness++;
+        } else if (currentMovement == 1 && lcdBrightness > 1) {
+          lcdBrightness--;
+        }
+
+        if (lcdBrightness != previousLcdBrightness) {
+          printSettingsInput(settingsPosition);
+          previousLcdBrightness = lcdBrightness;
+          analogWrite(lcdBacklight, lcdBrightness * 25);
+        }
+      } else if (settingsPosition == 2) {
         if (currentMovement == 0 && matrixBrightness < 15) {
           matrixBrightness++;
         } else if (currentMovement == 1 && matrixBrightness > 1) {
@@ -419,17 +448,38 @@ void loop() {
           previousMatrixBrightness = matrixBrightness;
           lc.setIntensity(0, matrixBrightness);
         }
-      } else if (settingsPosition == 1) {
-        if (currentMovement == 0 && lcdBrightness < 10) {
-          lcdBrightness++;
-        } else if (currentMovement == 1 && lcdBrightness > 1) {
-          lcdBrightness--;
+      } else if (settingsPosition == 3) {
+        if (currentMovement == 0 && soundOn == false) {
+          soundOn = true;
+        } else if (currentMovement == 1 && soundOn == true) {
+          soundOn = false;
         }
 
-        if (lcdBrightness != previousLcdBrightness) {
+        if (soundOn != previousSoundState) {
           printSettingsInput(settingsPosition);
-          previousLcdBrightness = lcdBrightness;
-          analogWrite(lcdBacklight, lcdBrightness * 25);
+          previousSoundState = soundOn;
+        }
+      } else if (settingsPosition == 4) {
+        if (currentMovement == 2) {
+          if (namePosition > 0) {
+            namePosition--;
+            printSettingsInput(settingsPosition);
+          } else {
+            // return to first setting
+            settingsPosition = 1;
+          }
+
+        } else if (currentMovement == 3 && namePosition < 2) {
+          namePosition++;
+          printSettingsInput(settingsPosition);
+        } else if (currentMovement == 0 && playerName[namePosition] < 'Z') {
+          playerName[namePosition]++;
+        } else if (currentMovement == 1 && playerName[namePosition] > 'A') {
+          playerName[namePosition]--;
+        }
+        if (strcmp(playerName, previousName)) {
+          printSettingsInput(settingsPosition);
+          strncpy(previousName, playerName, 3);
         }
       }
       previousMovement = currentMovement;
@@ -503,17 +553,34 @@ void placeBomb(byte xPosition, byte yPosition) {
 void detonateBomb() {
   if (bombPlaced) {
     mapMatrix[bombX][bombY] = 0;
-    if (bombX - 1 >= 0)
+    if (bombX - 1 >= 0) {
+      if (mapMatrix[bombX - 1][bombY] == 1)
+        score += 10;
+
       mapMatrix[bombX - 1][bombY] = 0;
+    }
 
-    if (bombX + 1 < matrixSize)
+    if (bombX + 1 < matrixSize) {
+      if (mapMatrix[bombX + 1][bombY] == 1)
+        score += 10;
+
       mapMatrix[bombX + 1][bombY] = 0;
+    }
 
-    if (bombY - 1 >= 0)
+    if (bombY - 1 >= 0) {
+      if (mapMatrix[bombX][bombY - 1] == 1)
+        score += 10;
+
       mapMatrix[bombX][bombY - 1] = 0;
+    }
 
-    if (bombY + 1 < matrixSize)
+
+    if (bombY + 1 < matrixSize) {
+      if (mapMatrix[bombX][bombY + 1] == 1)
+        score += 10;
+
       mapMatrix[bombX][bombY + 1] = 0;
+    }
 
     // check if player is in blast radius
     for (int blastRadius = -1; blastRadius <= 1; blastRadius++) {
@@ -672,9 +739,29 @@ void printSettings(byte settingsOption) {
       lcd.setCursor(0, 0);
       lcd.write((uint8_t)4);
       lcd.write("Back   Matrix ");
-      lcd.write((uint8_t)2);
+      lcd.write((uint8_t)1);
       lcd.setCursor(0, 1);
       lcd.write("    Brightness");
+      lcd.write((uint8_t)5);
+      break;
+    case 3:
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.write((uint8_t)4);
+      lcd.write("Back          ");
+      lcd.write((uint8_t)1);
+      lcd.setCursor(0, 1);
+      lcd.write("Sounds");
+      lcd.write((uint8_t)5);
+      break;
+    case 4:
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.write((uint8_t)4);
+      lcd.write("Back          ");
+      lcd.write((uint8_t)2);
+      lcd.setCursor(0, 1);
+      lcd.write("Player Name   ");
       lcd.write((uint8_t)5);
       break;
     default:
@@ -714,6 +801,37 @@ void printSettingsInput(byte settingsOption) {
       else
         lcd.write((uint8_t)1);
       break;
+    case 3:
+      lcd.clear();
+      lcd.write((uint8_t)4);
+      lcd.write("Back");
+      lcd.setCursor(0, 1);
+      lcd.write("Sound: ");
+      if (soundOn) {
+        lcd.write("ON");
+        lcd.write((uint8_t)0);
+      } else {
+        lcd.write("OFF");
+        lcd.write((uint8_t)2);
+      }
+      break;
+    case 4:
+      lcd.clear();
+      lcd.write((uint8_t)4);
+      lcd.write("Back");
+      lcd.write("  ");
+      for (byte i = 0; i < namePosition; i++) {
+        lcd.write(" ");
+      }
+      lcd.write((uint8_t)0);
+      lcd.setCursor(0, 1);
+      lcd.write("Name:  ");
+      for (byte i = 0; i < 3; i++) {
+        lcd.write(playerName[i]);
+      }
+      lcd.write(" ");
+      lcd.write((uint8_t)1);
+      break;
     default:
       break;
   }
@@ -743,10 +861,14 @@ void menuActions(byte menuOption) {
 void printGameStats(byte noLives, unsigned long playTime) {
   lcd.clear();
   lcd.setCursor(0, 0);
+  lcd.print("Score: ");
+  char scoreChar[4];
+  lcd.write(itoa(score, scoreChar, 10));
+  lcd.setCursor(13, 0);
   for (int i = 0; i < noLives; i++)
     lcd.write((uint8_t)3);
   lcd.setCursor(0, 1);
-  lcd.write("Play time: ");
+  lcd.write("Time: ");
   char playTimeChar[4];
   lcd.write(itoa(playTime, playTimeChar, 10));
 }
