@@ -97,7 +97,7 @@ int yAxisValue = 0;
 byte currentMovement = 0;
 byte previousMovement = 0;
 
-const int bombTimer = 3000;
+int bombTimer = 3000;
 unsigned long bombPlacedTime;
 bool bombPlaced = false;
 
@@ -105,7 +105,7 @@ byte bombX = 0;
 byte bombY = 0;
 
 byte bombBlinkState = 0;
-const int bombBlinkInterval = 100;  // 0.1 seconds
+int bombBlinkInterval = 100;  // 0.1 seconds
 unsigned long lastBombBlink = 0;
 
 byte debounceDelay = 100;
@@ -153,10 +153,10 @@ int score = 0;
 byte difficulty = 1;
 
 int highscores[5] = { 0, 0, 0, 0, 0 };
-char highscoreNames[5][3] = { "abc", "abd", "abe", "abf", "abx" };
+char highscoreNames[5][3] = { "AAA", "BBB", "CCC", "DDD", "EEE" };
 bool inHighscores = false;
 byte highscorePosition = 0;
-byte previousHighscorePosition = 0;
+byte previousHighscorePosition = 1;
 
 byte mapMatrix[matrixSize][matrixSize] = {
   { 0, 0, 0, 0, 0, 0, 0, 0 },
@@ -235,6 +235,18 @@ byte heartChar[8] = {
   0b00000
 };
 
+byte lcdBrightnessMemoryAddr = 0;
+byte matrixBrightnessMemoryAddr = sizeof(byte);
+byte soundStateMemoryAddr = sizeof(byte) + matrixBrightnessMemoryAddr;
+byte playerNameMemoryAddr = sizeof(bool) + soundStateMemoryAddr;
+byte difficultyMemoryAddr = 3 * sizeof(char) + playerNameMemoryAddr;
+byte highScoresMemoryAddr = sizeof(byte) + difficultyMemoryAddr;
+byte highScoreNamesMemoryAddr = 5 * sizeof(int) + highScoresMemoryAddr;
+
+bool inResetHighscores = false;
+bool inHowTo = false;
+bool inDifficulty = false;
+byte previousDifficulty = 0;
 void setup() {
 
   lc.shutdown(0, false);
@@ -259,10 +271,24 @@ void setup() {
   pinMode(lcdBacklight, OUTPUT);
 
   // read data from eeprom;
-  EEPROM.get(0, lcdBrightness);
-  EEPROM.get(sizeof(byte), matrixBrightness);
-  EEPROM.get(2 * sizeof(byte), soundOn);
-  EEPROM.get(2 * sizeof(byte) + sizeof(bool), playerName);
+
+  readIntArrayFromEEPROM(highScoreNamesMemoryAddr, highscores, 5);
+  readHighscoreNames(highScoreNamesMemoryAddr, highscoreNames, 5);
+  EEPROM.get(lcdBrightnessMemoryAddr, lcdBrightness);
+  EEPROM.get(matrixBrightnessMemoryAddr, matrixBrightness);
+  EEPROM.get(soundStateMemoryAddr, soundOn);
+  EEPROM.get(playerNameMemoryAddr, playerName);
+  EEPROM.get(difficultyMemoryAddr, difficulty);
+  // EEPROM.get(highScoreNamesMemoryAddr, highscoreNames);
+  // EEPROM.get(highScoresMemoryAddr, highscores);
+
+  // number of lives based on difficulty
+  noLives = 4 - difficulty;
+  // 1, 2, 3 seconds based on difficulty
+  bombTimer = 4000 - 1000 * difficulty;
+
+  // bomb blinks faster on higher difficulty
+  bombBlinkInterval = 120 - 20 * difficulty;
   // set lcd and matrix brightness
   lc.setIntensity(0, matrixBrightness);
   analogWrite(lcdBacklight, lcdBrightness * 25);
@@ -295,6 +321,12 @@ void loop() {
 
   joyButtonState = debounceInput(joystickButton, &joyButtonReading, &lastJoyPress, debounceDelay);
   currentMovement = joyDirection(xAxisValue, yAxisValue, minJoyThreshold, maxJoyThreshold, &joyMoved);
+
+  // keep the bomb state from getting stuck on
+  if (!bombPlaced) {
+    bombBlinkState = false;
+    noTone(buzzerPin);
+  }
 
   if (inGame) {
     currentMillis = millis();
@@ -347,7 +379,11 @@ void loop() {
     renderPlayer();
 
     if (playerDead() || playerWin()) {
-      // reset game
+      // save highscore only when score is on leaderboard
+      if (updateHighscore(score, playerName) != 10) {
+        saveHighscores();
+      }
+
       if (playerWin()) {
         printWin();
         inEndGameScreen = true;
@@ -424,10 +460,10 @@ void loop() {
       Serial.println("Settings Position");
       Serial.println(settingsPosition);
       printSettings(settingsPosition);
-      EEPROM.put(0, lcdBrightness);
-      EEPROM.put(sizeof(byte), matrixBrightness);
-      EEPROM.put(2 * sizeof(byte), soundOn);
-      EEPROM.put(2 * sizeof(byte) + sizeof(bool), playerName);
+      EEPROM.put(lcdBrightnessMemoryAddr, lcdBrightness);
+      EEPROM.put(matrixBrightnessMemoryAddr, matrixBrightness);
+      EEPROM.put(soundStateMemoryAddr, soundOn);
+      EEPROM.put(playerNameMemoryAddr, playerName);
     }
     if (currentMovement != previousMovement) {
       if (settingsPosition == 1) {
@@ -492,7 +528,7 @@ void loop() {
     }
   } else if (inMenu) {
     if (currentMovement != previousMovement) {
-      if (currentMovement == 1 && menuPosition < 4) {
+      if (currentMovement == 1 && menuPosition < 7) {
         menuPosition++;
       } else if (currentMovement == 0 && menuPosition > 1) {
         menuPosition--;
@@ -535,18 +571,103 @@ void loop() {
         printHighscore(highscorePosition);
         previousHighscorePosition = highscorePosition;
       }
-
-      previousMovement = currentMovement;
     }
+    previousMovement = currentMovement;
+  } else if (inResetHighscores) {
+    if (currentMovement != previousMovement) {
+      Serial.println(currentMovement);
+      if (currentMovement == 2) {
+        lcd.clear();
+        printMenu(menuPosition);
+        inSettings = false;
+        inSettingsInput = false;
+        inAbout = false;
+        inHighscores = false;
+        inResetHighscores = false;
+        inMenu = true;
+
+      } else if (currentMovement == 3) {
+        resetHighScores();
+        lcd.clear();
+        printMenu(menuPosition);
+        inSettings = false;
+        inSettingsInput = false;
+        inAbout = false;
+        inHighscores = false;
+        inResetHighscores = false;
+        inMenu = true;
+        menuPosition = 4;
+      }
+    }
+    previousMovement = currentMovement;
+  } else if (inHowTo) {
+    if (currentMovement != previousMovement) {
+      Serial.println(currentMovement);
+      if (currentMovement == 2) {
+        lcd.clear();
+        printMenu(menuPosition);
+        inSettings = false;
+        inSettingsInput = false;
+        inAbout = false;
+        inHighscores = false;
+        inResetHighscores = false;
+        inHowTo = false;
+        inMenu = true;
+      }
+    }
+    previousMovement = currentMovement;
+  } else if (inDifficulty) {
+    if (currentMovement != previousMovement) {
+      Serial.println(currentMovement);
+      if (currentMovement == 2) {
+        lcd.clear();
+        printMenu(menuPosition);
+        EEPROM.put(difficultyMemoryAddr, difficulty);
+        inSettings = false;
+        inSettingsInput = false;
+        inAbout = false;
+        inHighscores = false;
+        inResetHighscores = false;
+        inHowTo = false;
+        inDifficulty = false;
+        inMenu = true;
+      } else if (currentMovement == 0 && difficulty < 3) {
+        difficulty++;
+      } else if (currentMovement == 1 && difficulty > 1) {
+        difficulty--;
+      }
+
+      if (difficulty != previousDifficulty) {
+        printDifficulty(difficulty);
+        previousDifficulty = difficulty;
+        noLives = 4 - difficulty;
+        bombTimer = 4000 - 1000 * difficulty;
+      }
+    }
+    previousMovement = currentMovement;
   }
 }
-
-
 // generate map in a random manner
 void generateMap() {
   for (int row = 0; row < matrixSize; row++)
-    for (int col = 0; col < matrixSize; col++)
-      mapMatrix[row][col] = random(0, 2);
+    for (int col = 0; col < matrixSize; col++) {
+      switch (difficulty) {
+        case 1:
+          mapMatrix[row][col] = random(0, 2);
+          break;
+        case 2:
+          mapMatrix[row][col] = random(0, 3);
+          break;
+        case 3:
+          mapMatrix[row][col] = random(0, 4);
+          break;
+        default:
+          break;
+      }
+      // normalize values;
+      if (mapMatrix[row][col] > 0)
+        mapMatrix[row][col] = 1;
+    }
 
   // make space for the player to start
   mapMatrix[3][3] = 0;
@@ -585,21 +706,21 @@ void detonateBomb() {
     mapMatrix[bombX][bombY] = 0;
     if (bombX - 1 >= 0) {
       if (mapMatrix[bombX - 1][bombY] == 1)
-        score += 10;
+        score += 10 + 5 * difficulty;
 
       mapMatrix[bombX - 1][bombY] = 0;
     }
 
     if (bombX + 1 < matrixSize) {
       if (mapMatrix[bombX + 1][bombY] == 1)
-        score += 10;
+        score += 10 + 5 * difficulty;
 
       mapMatrix[bombX + 1][bombY] = 0;
     }
 
     if (bombY - 1 >= 0) {
       if (mapMatrix[bombX][bombY - 1] == 1)
-        score += 10;
+        score += 10 + 5 * difficulty;
 
       mapMatrix[bombX][bombY - 1] = 0;
     }
@@ -607,7 +728,7 @@ void detonateBomb() {
 
     if (bombY + 1 < matrixSize) {
       if (mapMatrix[bombX][bombY + 1] == 1)
-        score += 10;
+        score += 10 + 5 * difficulty;
 
       mapMatrix[bombX][bombY + 1] = 0;
     }
@@ -752,6 +873,32 @@ void printMenu(byte menuOption) {
       lcd.write("Highscores");
       lcd.write((uint8_t)5);
       lcd.write("    ");
+      lcd.write((uint8_t)1);
+      break;
+    case 5:
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.write("Reset");
+      lcd.write("          ");
+      lcd.write((uint8_t)1);
+      lcd.setCursor(0, 1);
+      lcd.write("Highscores");
+      lcd.write((uint8_t)5);
+      break;
+    case 6:
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.write("How to play");
+      lcd.write((uint8_t)5);
+      lcd.write("   ");
+      lcd.write((uint8_t)1);
+      break;
+    case 7:
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.write("Difficulty");
+      lcd.write((uint8_t)5);
+      lcd.write("    ");
       lcd.write((uint8_t)2);
       break;
     default:
@@ -879,6 +1026,8 @@ void menuActions(byte menuOption) {
     case 1:
       inGame = true;
       inMenu = false;
+      noLives = 4 - difficulty;
+      bombTimer = 4000 - 1000 * difficulty;
       renderMap();
       break;
     case 2:
@@ -892,9 +1041,27 @@ void menuActions(byte menuOption) {
       inMenu = false;
       break;
     case 4:
+      readIntArrayFromEEPROM(highScoresMemoryAddr, highscores, 5);
+      readHighscoreNames(highScoreNamesMemoryAddr, highscoreNames, 5);
       inHighscores = true;
       inMenu = false;
       printHighscore(0);
+      break;
+    case 5:
+      inResetHighscores = true;
+      inMenu = false;
+      printResetHighscores();
+      break;
+    case 6:
+      inMenu = false;
+      inHowTo = true;
+      printHowTo();
+      break;
+    case 7:
+      inDifficulty = true;
+      inMenu = false;
+      printDifficulty(difficulty);
+      break;
     default:
       break;
   }
@@ -956,9 +1123,43 @@ void resetGame() {
   lcd.clear();
   playerX = 3;
   playerY = 3;
-  noLives = 3;
+  noLives = 4 - difficulty;
+  bombTimer = 4000 - 1000 * difficulty;
   playTime = 0;
+  score = 0;
   printMenu(menuPosition);
+}
+
+void writeIntArrayIntoEEPROM(int address, int numbers[], int arraySize) {
+  int addressIndex = address;
+  for (int i = 0; i < arraySize; i++) {
+    EEPROM.write(addressIndex, numbers[i] >> 8);
+    EEPROM.write(addressIndex + 1, numbers[i] & 0xFF);
+    addressIndex += 2;
+  }
+}
+void readIntArrayFromEEPROM(int address, int numbers[], int arraySize) {
+  int addressIndex = address;
+  for (int i = 0; i < arraySize; i++) {
+    numbers[i] = (EEPROM.read(addressIndex) << 8) + EEPROM.read(addressIndex + 1);
+    addressIndex += 2;
+  }
+}
+void writeHighscoreNames(int address, char names[][3], int arraySize) {
+  int addressIndex = address;
+  for (int i = 0; i < arraySize; i++)
+    for (int j = 0; j < 3; j++) {
+      EEPROM.write(addressIndex, names[i][j]);
+      addressIndex += 1;
+    }
+}
+void readHighscoreNames(int address, char names[][3], int arraySize) {
+  int addressIndex = address;
+  for (int i = 0; i < arraySize; i++)
+    for (int j = 0; j < 3; j++) {
+      names[i][j] = EEPROM.read(addressIndex);
+      addressIndex += 1;
+    }
 }
 
 void printHighscore(byte place) {
@@ -983,4 +1184,92 @@ void printHighscore(byte place) {
     lcd.write((uint8_t)0);
   else
     lcd.write((uint8_t)1);
+}
+
+int updateHighscore(int score, char playerName[3]) {
+
+  int newPlace = 10;
+
+  for (int i = 0; i < 5; i++) {
+    if (score >= highscores[i]) {
+      newPlace = i;
+      break;
+    }
+  }
+
+  if (newPlace != 10) {
+    for (int i = 4; i > newPlace; i--) {
+      highscores[i] = highscores[i - 1];
+      strncpy(highscoreNames[i], highscoreNames[i - 1], 3);
+    }
+    highscores[newPlace] = score;
+    strncpy(highscoreNames[newPlace], playerName, 3);
+  }
+
+  return newPlace;
+}
+
+void saveHighscores() {
+  writeIntArrayIntoEEPROM(highScoresMemoryAddr, highscores, 5);
+  writeHighscoreNames(highScoreNamesMemoryAddr, highscoreNames, 5);
+}
+
+void resetHighScores() {
+  for (int i = 0; i < 5; i++) {
+    highscores[i] = 0;
+    strncpy(highscoreNames[i], "XXX", 3);
+  }
+
+  writeIntArrayIntoEEPROM(highScoresMemoryAddr, highscores, 5);
+  writeHighscoreNames(highScoreNamesMemoryAddr, highscoreNames, 5);
+}
+
+void printResetHighscores() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.write("Are you sure?");
+  lcd.setCursor(0, 1);
+  lcd.write((uint8_t)4);
+  lcd.write("NO");
+  lcd.write("         ");
+  lcd.write("YES");
+  lcd.write((uint8_t)5);
+}
+
+void printHowTo() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.write((uint8_t)4);
+  lcd.write("Back ");
+  lcd.write("Move: ");
+  lcd.write((uint8_t)4);
+  lcd.write((uint8_t)1);
+  lcd.write((uint8_t)5);
+  lcd.setCursor(0, 1);
+  lcd.write("Place Bomb:click");
+}
+
+void printDifficulty(byte difficulty) {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.write((uint8_t)4);
+  lcd.write("Back");
+  lcd.setCursor(0, 1);
+  lcd.write("Set: ");
+  switch (difficulty) {
+    case 1:
+      lcd.write("low");
+      lcd.write((uint8_t)2);
+      break;
+    case 2:
+      lcd.write("med");
+      lcd.write((uint8_t)1);
+      break;
+    case 3:
+      lcd.write("high");
+      lcd.write((uint8_t)0);
+      break;
+    default:
+      break;
+  }
 }
