@@ -75,7 +75,7 @@ byte lcdLineWidth = 16;
 int lcdScrollInterval = 400;
 
 LedControl lc = LedControl(driverDin, driverClock, driverLoad, 1);
-const byte matrixSize = 8;
+const byte matrixSize = 16;
 byte matrixBrightness = 2;
 byte previousMatrixBrightness = 2;
 
@@ -158,15 +158,39 @@ bool inHighscores = false;
 byte highscorePosition = 0;
 byte previousHighscorePosition = 1;
 
+byte lcdBrightnessMemoryAddr = 0;
+byte matrixBrightnessMemoryAddr = sizeof(byte);
+byte soundStateMemoryAddr = sizeof(byte) + matrixBrightnessMemoryAddr;
+byte difficultyMemoryAddr = 2 * sizeof(byte) + soundStateMemoryAddr;
+byte highScoresMemoryAddr = 3 * sizeof(char) + difficultyMemoryAddr;
+byte highScoreNamesMemoryAddr = 5 * sizeof(int) + highScoresMemoryAddr;
+byte playerNameMemoryAddr = 5 * 3 * sizeof(char) + highScoreNamesMemoryAddr;
+
+
+bool inResetHighscores = false;
+bool inHowTo = false;
+bool inDifficulty = false;
+byte previousDifficulty = 0;
+
+const int visibleSize = 8;  // Size of the visible portion
+
 byte mapMatrix[matrixSize][matrixSize] = {
-  { 0, 0, 0, 0, 0, 0, 0, 0 },
-  { 0, 0, 0, 0, 0, 0, 0, 0 },
-  { 0, 0, 0, 0, 0, 0, 0, 0 },
-  { 0, 0, 0, 0, 0, 0, 0, 0 },
-  { 0, 0, 0, 0, 0, 0, 0, 0 },
-  { 0, 0, 0, 0, 0, 0, 0, 0 },
-  { 0, 0, 0, 0, 0, 0, 0, 0 },
-  { 0, 0, 0, 0, 0, 0, 0, 0 },
+  { 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 },
+  { 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2 },
+  { 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2 },
+  { 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2 },
+  { 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2 },
+  { 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2 },
+  { 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2 },
+  { 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2 },
+  { 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2 },
+  { 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2 },
+  { 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2 },
+  { 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2 },
+  { 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2 },
+  { 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2 },
+  { 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2 },
+  { 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 }
 };
 
 byte arrowDownChar[8] = {
@@ -235,19 +259,17 @@ byte heartChar[8] = {
   0b00000
 };
 
-byte lcdBrightnessMemoryAddr = 0;
-byte matrixBrightnessMemoryAddr = sizeof(byte);
-byte soundStateMemoryAddr = sizeof(byte) + matrixBrightnessMemoryAddr;
-byte difficultyMemoryAddr = 2 * sizeof(byte) + soundStateMemoryAddr;
-byte highScoresMemoryAddr = 3 * sizeof(char) + difficultyMemoryAddr;
-byte highScoreNamesMemoryAddr = 5 * sizeof(int) + highScoresMemoryAddr;
-byte playerNameMemoryAddr = 5 * 3 * sizeof(char) + highScoreNamesMemoryAddr;
+const uint64_t matrixImages[7] = {
+  0x0066999d91660000,
+  0xc3e766181927468c,
+  0x18181800183c3c18,
+  0x7e18183c7e7e7e00,
+  0xc3e77e3c3c7ee7c3,
+  0x1800183862663c00,
+  0xfffffcfcf0f0c0c0
+};
+const int matrixImagesLen = sizeof(matrixImages) / 8;
 
-
-bool inResetHighscores = false;
-bool inHowTo = false;
-bool inDifficulty = false;
-byte previousDifficulty = 0;
 void setup() {
 
   lc.shutdown(0, false);
@@ -280,14 +302,10 @@ void setup() {
   EEPROM.get(soundStateMemoryAddr, soundOn);
   EEPROM.get(playerNameMemoryAddr, playerName);
   EEPROM.get(difficultyMemoryAddr, difficulty);
-  // EEPROM.get(highScoreNamesMemoryAddr, highscoreNames);
-  // EEPROM.get(highScoresMemoryAddr, highscores);
-
   // number of lives based on difficulty
   noLives = 4 - difficulty;
   // 1, 2, 3 seconds based on difficulty
   bombTimer = 4000 - 1000 * difficulty;
-
   // bomb blinks faster on higher difficulty
   bombBlinkInterval = 120 - 20 * difficulty;
   // set lcd and matrix brightness
@@ -310,7 +328,6 @@ void setup() {
 
   generateMap();
 
-  Serial.begin(9600);
 }
 void loop() {
   // read the joystick values
@@ -324,234 +341,26 @@ void loop() {
   currentMovement = joyDirection(xAxisValue, yAxisValue, minJoyThreshold, maxJoyThreshold, &joyMoved);
 
   // keep the bomb state from getting stuck on
-  if (!bombPlaced) {
+  if (!bombPlaced && (inEndGameScreen || inGame)) {
     bombBlinkState = false;
     noTone(buzzerPin);
   }
 
+  // make sound on menu and settings change
+  if (currentMovement != previousMovement && currentMovement != 4 && !inGame && soundOn) {
+    tone(buzzerPin, bombTone, 60);
+  }
+
   if (inGame) {
-    currentMillis = millis();
-    if (currentMillis - previousMillis > 1000) {  // count seconds
-      playTime++;
-      playTime %= 1000;
-      previousMillis = millis();
-      printGameStats(noLives, playTime);
-    }
-
-    if (noLives != previousLives) {
-      printGameStats(noLives, playTime);
-      previousLives = noLives;
-    }
-
-    if (joyButtonState) {
-      placeBomb(playerX, playerY);
-    }
-
-    if (currentMovement != previousMovement) {
-      movePlayer(currentMovement);
-      previousMovement = currentMovement;
-      renderMap();
-    }
-
-    if (millis() - lastPlayerBlink > playerBlinkInterval) {
-      playerBlinkState = !playerBlinkState;
-      lastPlayerBlink = millis();
-    }
-
-    // we render the bomb only when one is placed
-    if (bombPlaced && (millis() - lastBombBlink > bombBlinkInterval)) {
-      bombBlinkState = !bombBlinkState;
-      lastBombBlink = millis();
-      renderBomb();
-    }
-
-    if (bombBlinkState && soundOn) {
-      tone(buzzerPin, bombTone);
-    } else {
-      noTone(buzzerPin);
-    }
-
-    // we render the map only when a change to the walls happens
-    if (bombPlaced && (millis() - bombPlacedTime > bombTimer)) {
-      detonateBomb();
-      renderMap();
-    }
-
-    renderPlayer();
-
-    if (playerDead() || playerWin()) {
-      // save highscore only when score is on leaderboard
-      bombBlinkState = false;
-      noTone(buzzerPin);
-      printScore();
-      int newPlace = updateHighscore(score, playerName);
-      if (newPlace != 10) {
-        saveHighscores();
-        printScore();
-        printScoreBeat(newPlace);
-      }
-      delay(3000);
-
-      if (playerWin()) {
-        printWin();
-        inEndGameScreen = true;
-        inGame = false;
-        inMenu = false;
-      }
-
-      else if (playerDead()) {
-        printGameOver();
-        inEndGameScreen = true;
-        inGame = false;
-        inMenu = false;
-      }
-    }
+    handleGameLogic();
   } else if (inAbout) {
-    if (currentMovement == 2) {
-      inAbout = false;
-      inMenu = true;
-      lcd.clear();
-      printMenu(menuPosition);
-    } else {
-      if (millis() - previousMillis > lcdScrollInterval) {
-        previousMillis = millis();
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.write(" ");  // to ignore scroll
-        lcd.write((uint8_t)4);
-        lcd.write("Back");
-        lcd.setCursor(0, 1);
-        for (byte i = aboutStringPos; i <= aboutStringPos + lcdLineWidth; i++)
-          lcd.print(aboutString[i]);
-        aboutStringPos++;
-        if (aboutStringPos > aboutStringLen - lcdLineWidth)  // wrap string
-          aboutStringPos = 0;
-        lcd.scrollDisplayLeft();
-      }
-    }
+    printAbout();
   } else if (inSettings) {
-    if (currentMovement != previousMovement) {
-      Serial.println(currentMovement);
-      if (currentMovement == 2) {
-        lcd.clear();
-        printMenu(menuPosition);
-        inSettings = false;
-        inSettingsInput = false;
-        inAbout = false;
-        inMenu = true;
-      } else if (currentMovement == 3) {
-        lcd.clear();
-        printSettingsInput(settingsPosition);
-        inSettingsInput = true;
-        inSettings = false;
-        inAbout = false;
-      }
-      if (currentMovement == 1 && settingsPosition < 4) {
-        settingsPosition++;
-      } else if (currentMovement == 0 && settingsPosition > 1) {
-        settingsPosition--;
-      }
-
-      if (settingsPosition != previousSettingsPosition) {
-        printSettings(settingsPosition);
-        previousSettingsPosition = settingsPosition;
-      }
-      previousMovement = currentMovement;
-    }
+    navigateSettings();
   } else if (inSettingsInput) {
-    if (currentMovement == 2 && settingsPosition != 4) {
-      inSettingsInput = false;
-      inAbout = false;
-      inSettings = true;
-      inMenu = false;
-      lcd.clear();
-      Serial.println("Settings Position");
-      Serial.println(settingsPosition);
-      printSettings(settingsPosition);
-      EEPROM.put(lcdBrightnessMemoryAddr, lcdBrightness);
-      EEPROM.put(matrixBrightnessMemoryAddr, matrixBrightness);
-      EEPROM.put(soundStateMemoryAddr, soundOn);
-      EEPROM.put(playerNameMemoryAddr, playerName);
-    }
-    if (currentMovement != previousMovement) {
-      if (settingsPosition == 1) {
-        if (currentMovement == 0 && lcdBrightness < 10) {
-          lcdBrightness++;
-        } else if (currentMovement == 1 && lcdBrightness > 1) {
-          lcdBrightness--;
-        }
-
-        if (lcdBrightness != previousLcdBrightness) {
-          printSettingsInput(settingsPosition);
-          previousLcdBrightness = lcdBrightness;
-          analogWrite(lcdBacklight, lcdBrightness * 25);
-        }
-      } else if (settingsPosition == 2) {
-        if (currentMovement == 0 && matrixBrightness < 15) {
-          matrixBrightness++;
-        } else if (currentMovement == 1 && matrixBrightness > 1) {
-          matrixBrightness--;
-        }
-
-        if (matrixBrightness != previousMatrixBrightness) {
-          printSettingsInput(settingsPosition);
-          previousMatrixBrightness = matrixBrightness;
-          lc.setIntensity(0, matrixBrightness);
-        }
-      } else if (settingsPosition == 3) {
-        if (currentMovement == 0 && soundOn == false) {
-          soundOn = true;
-        } else if (currentMovement == 1 && soundOn == true) {
-          soundOn = false;
-        }
-
-        if (soundOn != previousSoundState) {
-          printSettingsInput(settingsPosition);
-          previousSoundState = soundOn;
-        }
-      } else if (settingsPosition == 4) {
-        if (currentMovement == 2) {
-          if (namePosition > 0) {
-            namePosition--;
-            printSettingsInput(settingsPosition);
-          } else {
-            // return to first setting
-            settingsPosition = 1;
-          }
-
-        } else if (currentMovement == 3 && namePosition < 2) {
-          namePosition++;
-          printSettingsInput(settingsPosition);
-        } else if (currentMovement == 0 && playerName[namePosition] < 'Z') {
-          playerName[namePosition]++;
-        } else if (currentMovement == 1 && playerName[namePosition] > 'A') {
-          playerName[namePosition]--;
-        }
-        if (strcmp(playerName, previousName)) {
-          printSettingsInput(settingsPosition);
-          strncpy(previousName, playerName, 3);
-        }
-      }
-      previousMovement = currentMovement;
-    }
+    handleSettingsInput();
   } else if (inMenu) {
-    if (currentMovement != previousMovement) {
-      if (currentMovement == 1 && menuPosition < 7) {
-        menuPosition++;
-      } else if (currentMovement == 0 && menuPosition > 1) {
-        menuPosition--;
-      }
-
-      if (menuPosition != previousMenuPosition) {
-        printMenu(menuPosition);
-        previousMenuPosition = menuPosition;
-      }
-      previousMovement = currentMovement;
-    }
-
-    if (currentMovement == 3) {
-      menuActions(menuPosition);
-    }
+    navigateMenu();
   } else if (inEndGameScreen) {
     if (currentMovement != previousMovement) {
       inEndGameScreen = false;
@@ -559,107 +368,19 @@ void loop() {
     }
     previousMovement = currentMovement;
   } else if (inHighscores) {
-    if (currentMovement != previousMovement) {
-      Serial.println(currentMovement);
-      if (currentMovement == 2) {
-        lcd.clear();
-        printMenu(menuPosition);
-        inSettings = false;
-        inSettingsInput = false;
-        inAbout = false;
-        inHighscores = false;
-        inMenu = true;
-      } else if (currentMovement == 1 && highscorePosition < 4) {
-        highscorePosition++;
-      } else if (currentMovement == 0 && highscorePosition > 0) {
-        highscorePosition--;
-      }
-
-      if (highscorePosition != previousHighscorePosition) {
-        printHighscore(highscorePosition);
-        previousHighscorePosition = highscorePosition;
-      }
-    }
-    previousMovement = currentMovement;
+    navigateHighscores();
   } else if (inResetHighscores) {
-    if (currentMovement != previousMovement) {
-      Serial.println(currentMovement);
-      if (currentMovement == 2) {
-        lcd.clear();
-        printMenu(menuPosition);
-        inSettings = false;
-        inSettingsInput = false;
-        inAbout = false;
-        inHighscores = false;
-        inResetHighscores = false;
-        inMenu = true;
-
-      } else if (currentMovement == 3) {
-        resetHighScores();
-        lcd.clear();
-        printMenu(menuPosition);
-        inSettings = false;
-        inSettingsInput = false;
-        inAbout = false;
-        inHighscores = false;
-        inResetHighscores = false;
-        inMenu = true;
-        menuPosition = 4;
-      }
-    }
-    previousMovement = currentMovement;
+    handleHighscoreReset();
   } else if (inHowTo) {
-    if (currentMovement != previousMovement) {
-      Serial.println(currentMovement);
-      if (currentMovement == 2) {
-        lcd.clear();
-        printMenu(menuPosition);
-        inSettings = false;
-        inSettingsInput = false;
-        inAbout = false;
-        inHighscores = false;
-        inResetHighscores = false;
-        inHowTo = false;
-        inMenu = true;
-      }
-    }
-    previousMovement = currentMovement;
+    handleHowTo();
   } else if (inDifficulty) {
-    if (currentMovement != previousMovement) {
-      Serial.println(currentMovement);
-      if (currentMovement == 2) {
-        lcd.clear();
-        printMenu(menuPosition);
-        EEPROM.put(difficultyMemoryAddr, difficulty);
-        inSettings = false;
-        inSettingsInput = false;
-        inAbout = false;
-        inHighscores = false;
-        inResetHighscores = false;
-        inHowTo = false;
-        inDifficulty = false;
-        inMenu = true;
-      } else if (currentMovement == 0 && difficulty < 3) {
-        difficulty++;
-      } else if (currentMovement == 1 && difficulty > 1) {
-        difficulty--;
-      }
-
-      if (difficulty != previousDifficulty) {
-        printDifficulty(difficulty);
-        previousDifficulty = difficulty;
-        noLives = 4 - difficulty;
-        bombTimer = 4000 - 1000 * difficulty;
-        bombBlinkInterval = 120 - 20 * difficulty;
-      }
-    }
-    previousMovement = currentMovement;
+    handleDifficultyChange();
   }
 }
 // generate map in a random manner
 void generateMap() {
-  for (int row = 0; row < matrixSize; row++)
-    for (int col = 0; col < matrixSize; col++) {
+  for (int row = 1; row < matrixSize - 1; row++)
+    for (int col = 1; col < matrixSize - 1; col++) {
       switch (difficulty) {
         case 1:
           mapMatrix[row][col] = random(0, 2);
@@ -685,23 +406,29 @@ void generateMap() {
   mapMatrix[4][4] = 0;
 }
 
+// render the map keeping the player in the center
 void renderMap() {
-  for (int row = 0; row < matrixSize; row++)
-    for (int col = 0; col < matrixSize; col++)
-      lc.setLed(0, row, col, mapMatrix[row][col]);
+  for (int row = 0; row < visibleSize; row++)
+    for (int col = 0; col < visibleSize; col++)
+      if (playerX - 3 + row > 15 || playerY - 3 + col > 15 || playerX - 3 + row < 0 || playerY - 3 + col < 0) {
+        lc.setLed(0, row, col, 0);
+      } else
+        lc.setLed(0, row, col, mapMatrix[playerX - 3 + row][playerY - 3 + col]);
 }
 
 void renderPlayer() {
-  lc.setLed(0, playerX, playerY, playerBlinkState);
+  lc.setLed(0, 3, 3, playerBlinkState);  // render player in the center of the visible portion
 }
 
 void renderBomb() {
-  lc.setLed(0, bombX, bombY, bombBlinkState);
+  // render the bomb only if it is within the visible portion
+  if (bombX >= playerX - 3 && bombX < playerX + 5 && bombY >= playerY - 3 && bombY < playerY + 5)
+    lc.setLed(0, bombX - playerX + 3, bombY - playerY + 3, bombBlinkState);
 }
 
 void placeBomb(byte xPosition, byte yPosition) {
-
-  if (!bombPlaced) {
+  // ensure that the bomb is placed within the visible portion
+  if (!bombPlaced && xPosition >= playerX - 3 && xPosition < playerX + 5 && yPosition >= playerY - 3 && yPosition < playerY + 5) {
     bombX = xPosition;
     bombY = yPosition;
     bombPlaced = true;
@@ -714,32 +441,31 @@ void detonateBomb() {
   if (bombPlaced) {
     mapMatrix[bombX][bombY] = 0;
     if (bombX - 1 >= 0) {
-      if (mapMatrix[bombX - 1][bombY] == 1)
+      if (mapMatrix[bombX - 1][bombY] == 1) {
         score += 10 + 5 * difficulty;
-
-      mapMatrix[bombX - 1][bombY] = 0;
+        mapMatrix[bombX - 1][bombY] = 0;
+      }
     }
 
     if (bombX + 1 < matrixSize) {
-      if (mapMatrix[bombX + 1][bombY] == 1)
+      if (mapMatrix[bombX + 1][bombY] == 1) {
         score += 10 + 5 * difficulty;
-
-      mapMatrix[bombX + 1][bombY] = 0;
+        mapMatrix[bombX + 1][bombY] = 0;
+      }
     }
 
     if (bombY - 1 >= 0) {
-      if (mapMatrix[bombX][bombY - 1] == 1)
+      if (mapMatrix[bombX][bombY - 1] == 1) {
         score += 10 + 5 * difficulty;
-
-      mapMatrix[bombX][bombY - 1] = 0;
+        mapMatrix[bombX][bombY - 1] = 0;
+      }
     }
 
-
     if (bombY + 1 < matrixSize) {
-      if (mapMatrix[bombX][bombY + 1] == 1)
+      if (mapMatrix[bombX][bombY + 1] == 1) {
         score += 10 + 5 * difficulty;
-
-      mapMatrix[bombX][bombY + 1] = 0;
+        mapMatrix[bombX][bombY + 1] = 0;
+      }
     }
 
     // check if player is in blast radius
@@ -859,6 +585,7 @@ void printMenu(byte menuOption) {
       lcd.write((uint8_t)5);
       lcd.write("    ");
       lcd.write((uint8_t)0);
+      displayImage(matrixImages[menuOption - 1]);
       break;
     case 2:
       lcd.clear();
@@ -867,6 +594,7 @@ void printMenu(byte menuOption) {
       lcd.write((uint8_t)5);
       lcd.write("      ");
       lcd.write((uint8_t)1);
+      displayImage(matrixImages[menuOption - 1]);
       break;
     case 3:
       lcd.clear();
@@ -875,6 +603,7 @@ void printMenu(byte menuOption) {
       lcd.write((uint8_t)5);
       lcd.write("         ");
       lcd.write((uint8_t)1);
+      displayImage(matrixImages[menuOption - 1]);
       break;
     case 4:
       lcd.clear();
@@ -883,6 +612,7 @@ void printMenu(byte menuOption) {
       lcd.write((uint8_t)5);
       lcd.write("    ");
       lcd.write((uint8_t)1);
+      displayImage(matrixImages[menuOption - 1]);
       break;
     case 5:
       lcd.clear();
@@ -893,6 +623,7 @@ void printMenu(byte menuOption) {
       lcd.setCursor(0, 1);
       lcd.write("Highscores");
       lcd.write((uint8_t)5);
+      displayImage(matrixImages[menuOption - 1]);
       break;
     case 6:
       lcd.clear();
@@ -901,6 +632,7 @@ void printMenu(byte menuOption) {
       lcd.write((uint8_t)5);
       lcd.write("   ");
       lcd.write((uint8_t)1);
+      displayImage(matrixImages[menuOption - 1]);
       break;
     case 7:
       lcd.clear();
@@ -909,6 +641,7 @@ void printMenu(byte menuOption) {
       lcd.write((uint8_t)5);
       lcd.write("    ");
       lcd.write((uint8_t)2);
+      displayImage(matrixImages[menuOption - 1]);
       break;
     default:
       break;
@@ -1202,28 +935,21 @@ int updateHighscore(int score, char playerName[3]) {
   int newPlace = 10;
 
   for (int i = 0; i < 5; i++) {
-    Serial.print(highscores[i]);
     if (score >= highscores[i]) {
       newPlace = i;
       break;
     }
   }
 
-  Serial.println("PLACE");
-  Serial.println(newPlace);
   if (newPlace != 10) {
     for (int i = 4; i > newPlace; i--) {
       highscores[i] = highscores[i - 1];
       strncpy(highscoreNames[i], highscoreNames[i - 1], 3);
     }
-    Serial.println(score);
     highscores[newPlace] = score;
-    for(int i = 0; i < 3; i++) {
+    for (int i = 0; i < 3; i++) {
       strncpy(highscoreNames[newPlace], playerName, 3);
     }
-    Serial.println("SCORE-NAME");
-    Serial.println(highscores[newPlace]);
-    Serial.println(highscoreNames[newPlace]);
   }
 
   return newPlace;
@@ -1305,7 +1031,349 @@ void printScore() {
 void printScoreBeat(int newPlace) {
   lcd.setCursor(0, 1);
   lcd.write("Score Beaten: ");
-  char placeChar[1];
-  newPlace += 1;
-  lcd.write(itoa(newPlace, placeChar, 10));
+  char placeChar = '0';
+  placeChar = placeChar + newPlace + 1;
+  lcd.write(placeChar);
+}
+
+void displayImage(uint64_t image) {
+  for (int i = 0; i < 8; i++) {
+    byte row = (image >> i * 8) & 0xFF;
+    for (int j = 0; j < 8; j++) {
+      lc.setLed(0, i, j, bitRead(row, j));
+    }
+  }
+}
+
+void navigateSettings() {
+  delay(1);
+  if (currentMovement != previousMovement) {
+    if (currentMovement == 2) {
+      lcd.clear();
+      printMenu(menuPosition);
+      inSettings = false;
+      inSettingsInput = false;
+      inAbout = false;
+      inMenu = true;
+    } else if (currentMovement == 3) {
+      lcd.clear();
+      printSettingsInput(settingsPosition);
+      inSettingsInput = true;
+      inSettings = false;
+      inAbout = false;
+    }
+    if (currentMovement == 1 && settingsPosition < 4) {
+      settingsPosition++;
+    } else if (currentMovement == 0 && settingsPosition > 1) {
+      settingsPosition--;
+    }
+
+    if (settingsPosition != previousSettingsPosition) {
+      printSettings(settingsPosition);
+      previousSettingsPosition = settingsPosition;
+    }
+    previousMovement = currentMovement;
+  }
+}
+
+void printAbout() {
+  if (currentMovement == 2) {
+    inAbout = false;
+    inMenu = true;
+    lcd.clear();
+    printMenu(menuPosition);
+  } else {
+    if (millis() - previousMillis > lcdScrollInterval) {
+      previousMillis = millis();
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.write(" ");  // to ignore scroll
+      lcd.write((uint8_t)4);
+      lcd.write("Back");
+      lcd.setCursor(0, 1);
+      for (byte i = aboutStringPos; i <= aboutStringPos + lcdLineWidth; i++)
+        lcd.print(aboutString[i]);
+      aboutStringPos++;
+      if (aboutStringPos > aboutStringLen - lcdLineWidth)  // wrap string
+        aboutStringPos = 0;
+      lcd.scrollDisplayLeft();
+    }
+  }
+}
+
+void handleSettingsInput() {
+  if (currentMovement == 2 && settingsPosition != 4) {
+    inSettingsInput = false;
+    inAbout = false;
+    inSettings = true;
+    inMenu = false;
+    lcd.clear();
+    printSettings(settingsPosition);
+    EEPROM.put(lcdBrightnessMemoryAddr, lcdBrightness);
+    EEPROM.put(matrixBrightnessMemoryAddr, matrixBrightness);
+    EEPROM.put(soundStateMemoryAddr, soundOn);
+    EEPROM.put(playerNameMemoryAddr, playerName);
+  }
+  if (currentMovement != previousMovement) {
+    if (settingsPosition == 1) {
+      if (currentMovement == 0 && lcdBrightness < 10) {
+        lcdBrightness++;
+      } else if (currentMovement == 1 && lcdBrightness > 1) {
+        lcdBrightness--;
+      }
+
+      if (lcdBrightness != previousLcdBrightness) {
+        printSettingsInput(settingsPosition);
+        previousLcdBrightness = lcdBrightness;
+        analogWrite(lcdBacklight, lcdBrightness * 25);
+      }
+    } else if (settingsPosition == 2) {
+      if (currentMovement == 0 && matrixBrightness < 15) {
+        matrixBrightness++;
+      } else if (currentMovement == 1 && matrixBrightness > 1) {
+        matrixBrightness--;
+      }
+
+      if (matrixBrightness != previousMatrixBrightness) {
+        printSettingsInput(settingsPosition);
+        previousMatrixBrightness = matrixBrightness;
+        lc.setIntensity(0, matrixBrightness);
+      }
+    } else if (settingsPosition == 3) {
+      if (currentMovement == 0 && soundOn == false) {
+        soundOn = true;
+      } else if (currentMovement == 1 && soundOn == true) {
+        soundOn = false;
+      }
+
+      if (soundOn != previousSoundState) {
+        printSettingsInput(settingsPosition);
+        previousSoundState = soundOn;
+      }
+    } else if (settingsPosition == 4) {
+      if (currentMovement == 2) {
+        if (namePosition > 0) {
+          namePosition--;
+          printSettingsInput(settingsPosition);
+        } else {
+          // return to first setting
+          settingsPosition = 1;
+        }
+
+      } else if (currentMovement == 3 && namePosition < 2) {
+        namePosition++;
+        printSettingsInput(settingsPosition);
+      } else if (currentMovement == 0 && playerName[namePosition] < 'Z') {
+        playerName[namePosition]++;
+      } else if (currentMovement == 1 && playerName[namePosition] > 'A') {
+        playerName[namePosition]--;
+      }
+      if (strcmp(playerName, previousName)) {
+        printSettingsInput(settingsPosition);
+        strncpy(previousName, playerName, 3);
+      }
+    }
+    previousMovement = currentMovement;
+  }
+}
+
+void navigateMenu() {
+  delay(1);
+  if (currentMovement != previousMovement) {
+    if (currentMovement == 1 && menuPosition < 7) {
+      menuPosition++;
+    } else if (currentMovement == 0 && menuPosition > 1) {
+      menuPosition--;
+    }
+
+    if (menuPosition != previousMenuPosition) {
+      printMenu(menuPosition);
+      previousMenuPosition = menuPosition;
+    }
+    previousMovement = currentMovement;
+  }
+
+  if (currentMovement == 3) {
+    menuActions(menuPosition);
+  }
+}
+
+void navigateHighscores() {
+  delay(1);
+  if (currentMovement != previousMovement) {
+    if (currentMovement == 2) {
+      lcd.clear();
+      printMenu(menuPosition);
+      inSettings = false;
+      inSettingsInput = false;
+      inAbout = false;
+      inHighscores = false;
+      inMenu = true;
+    } else if (currentMovement == 1 && highscorePosition < 4) {
+      highscorePosition++;
+    } else if (currentMovement == 0 && highscorePosition > 0) {
+      highscorePosition--;
+    }
+
+    if (highscorePosition != previousHighscorePosition) {
+      printHighscore(highscorePosition);
+      previousHighscorePosition = highscorePosition;
+    }
+  }
+  previousMovement = currentMovement;
+}
+
+void handleHighscoreReset() {
+  if (currentMovement != previousMovement) {
+    if (currentMovement == 2) {
+      lcd.clear();
+      printMenu(menuPosition);
+      inSettings = false;
+      inSettingsInput = false;
+      inAbout = false;
+      inHighscores = false;
+      inResetHighscores = false;
+      inMenu = true;
+
+    } else if (currentMovement == 3) {
+      resetHighScores();
+      lcd.clear();
+      printMenu(menuPosition);
+      inSettings = false;
+      inSettingsInput = false;
+      inAbout = false;
+      inHighscores = false;
+      inResetHighscores = false;
+      inMenu = true;
+      menuPosition = 4;
+    }
+  }
+  previousMovement = currentMovement;
+}
+
+void handleHowTo() {
+  if (currentMovement != previousMovement) {
+    if (currentMovement == 2) {
+      lcd.clear();
+      printMenu(menuPosition);
+      inSettings = false;
+      inSettingsInput = false;
+      inAbout = false;
+      inHighscores = false;
+      inResetHighscores = false;
+      inHowTo = false;
+      inMenu = true;
+    }
+  }
+  previousMovement = currentMovement;
+}
+
+void handleDifficultyChange() {
+  if (currentMovement != previousMovement) {
+    if (currentMovement == 2) {
+      lcd.clear();
+      printMenu(menuPosition);
+      EEPROM.put(difficultyMemoryAddr, difficulty);
+      inSettings = false;
+      inSettingsInput = false;
+      inAbout = false;
+      inHighscores = false;
+      inResetHighscores = false;
+      inHowTo = false;
+      inDifficulty = false;
+      inMenu = true;
+    } else if (currentMovement == 0 && difficulty < 3) {
+      difficulty++;
+    } else if (currentMovement == 1 && difficulty > 1) {
+      difficulty--;
+    }
+
+    if (difficulty != previousDifficulty) {
+      printDifficulty(difficulty);
+      previousDifficulty = difficulty;
+      noLives = 4 - difficulty;
+      bombTimer = 4000 - 1000 * difficulty;
+      bombBlinkInterval = 120 - 20 * difficulty;
+    }
+  }
+  previousMovement = currentMovement;
+}
+
+void handleGameLogic() {
+  currentMillis = millis();
+  if (currentMillis - previousMillis > 1000) {  // count seconds
+    playTime++;
+    playTime %= 1000;
+    previousMillis = millis();
+    printGameStats(noLives, playTime);
+  }
+
+  if (noLives != previousLives) {
+    printGameStats(noLives, playTime);
+    previousLives = noLives;
+  }
+
+  if (joyButtonState) {
+    placeBomb(playerX, playerY);
+  }
+
+  if (currentMovement != previousMovement) {
+    movePlayer(currentMovement);
+    previousMovement = currentMovement;
+    renderMap();
+  }
+
+  if (millis() - lastPlayerBlink > playerBlinkInterval) {
+    playerBlinkState = !playerBlinkState;
+    lastPlayerBlink = millis();
+  }
+
+  // we render the bomb only when one is placed
+  if (bombPlaced && (millis() - lastBombBlink > bombBlinkInterval)) {
+    bombBlinkState = !bombBlinkState;
+    lastBombBlink = millis();
+    renderBomb();
+  }
+
+  if (bombBlinkState && soundOn) {
+    tone(buzzerPin, bombTone);
+  } else {
+    noTone(buzzerPin);
+  }
+
+  // we render the map only when a change to the walls happens
+  if (bombPlaced && (millis() - bombPlacedTime > bombTimer)) {
+    detonateBomb();
+    renderMap();
+  }
+
+  renderPlayer();
+
+  if (playerDead() || playerWin()) {
+    // save highscore only when score is on leaderboard
+    bombBlinkState = false;
+    noTone(buzzerPin);
+    printScore();
+    int newPlace = updateHighscore(score, playerName);
+    if (newPlace != 10) {
+      saveHighscores();
+      printScore();
+      printScoreBeat(newPlace);
+    }
+    delay(3000);
+
+    if (playerWin()) {
+      printWin();
+      inEndGameScreen = true;
+      inGame = false;
+      inMenu = false;
+    }
+
+    else if (playerDead()) {
+      printGameOver();
+      inEndGameScreen = true;
+      inGame = false;
+      inMenu = false;
+    }
+  }
 }
