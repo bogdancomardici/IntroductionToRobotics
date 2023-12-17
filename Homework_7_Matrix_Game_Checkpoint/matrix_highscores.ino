@@ -238,10 +238,11 @@ byte heartChar[8] = {
 byte lcdBrightnessMemoryAddr = 0;
 byte matrixBrightnessMemoryAddr = sizeof(byte);
 byte soundStateMemoryAddr = sizeof(byte) + matrixBrightnessMemoryAddr;
-byte playerNameMemoryAddr = sizeof(bool) + soundStateMemoryAddr;
-byte difficultyMemoryAddr = 3 * sizeof(char) + playerNameMemoryAddr;
-byte highScoresMemoryAddr = sizeof(byte) + difficultyMemoryAddr;
+byte difficultyMemoryAddr = 2 * sizeof(byte) + soundStateMemoryAddr;
+byte highScoresMemoryAddr = 3 * sizeof(char) + difficultyMemoryAddr;
 byte highScoreNamesMemoryAddr = 5 * sizeof(int) + highScoresMemoryAddr;
+byte playerNameMemoryAddr = 5 * 3 * sizeof(char) + highScoreNamesMemoryAddr;
+
 
 bool inResetHighscores = false;
 bool inHowTo = false;
@@ -272,7 +273,7 @@ void setup() {
 
   // read data from eeprom;
 
-  readIntArrayFromEEPROM(highScoreNamesMemoryAddr, highscores, 5);
+  readIntArrayFromEEPROM(highScoresMemoryAddr, highscores, 5);
   readHighscoreNames(highScoreNamesMemoryAddr, highscoreNames, 5);
   EEPROM.get(lcdBrightnessMemoryAddr, lcdBrightness);
   EEPROM.get(matrixBrightnessMemoryAddr, matrixBrightness);
@@ -380,9 +381,16 @@ void loop() {
 
     if (playerDead() || playerWin()) {
       // save highscore only when score is on leaderboard
-      if (updateHighscore(score, playerName) != 10) {
+      bombBlinkState = false;
+      noTone(buzzerPin);
+      printScore();
+      int newPlace = updateHighscore(score, playerName);
+      if (newPlace != 10) {
         saveHighscores();
+        printScore();
+        printScoreBeat(newPlace);
       }
+      delay(3000);
 
       if (playerWin()) {
         printWin();
@@ -642,6 +650,7 @@ void loop() {
         previousDifficulty = difficulty;
         noLives = 4 - difficulty;
         bombTimer = 4000 - 1000 * difficulty;
+        bombBlinkInterval = 120 - 20 * difficulty;
       }
     }
     previousMovement = currentMovement;
@@ -1028,6 +1037,7 @@ void menuActions(byte menuOption) {
       inMenu = false;
       noLives = 4 - difficulty;
       bombTimer = 4000 - 1000 * difficulty;
+      bombBlinkInterval = 120 - 20 * difficulty;
       renderMap();
       break;
     case 2:
@@ -1125,6 +1135,7 @@ void resetGame() {
   playerY = 3;
   noLives = 4 - difficulty;
   bombTimer = 4000 - 1000 * difficulty;
+  bombBlinkInterval = 120 - 20 * difficulty;
   playTime = 0;
   score = 0;
   printMenu(menuPosition);
@@ -1191,19 +1202,28 @@ int updateHighscore(int score, char playerName[3]) {
   int newPlace = 10;
 
   for (int i = 0; i < 5; i++) {
+    Serial.print(highscores[i]);
     if (score >= highscores[i]) {
       newPlace = i;
       break;
     }
   }
 
+  Serial.println("PLACE");
+  Serial.println(newPlace);
   if (newPlace != 10) {
     for (int i = 4; i > newPlace; i--) {
       highscores[i] = highscores[i - 1];
       strncpy(highscoreNames[i], highscoreNames[i - 1], 3);
     }
+    Serial.println(score);
     highscores[newPlace] = score;
-    strncpy(highscoreNames[newPlace], playerName, 3);
+    for(int i = 0; i < 3; i++) {
+      strncpy(highscoreNames[newPlace], playerName, 3);
+    }
+    Serial.println("SCORE-NAME");
+    Serial.println(highscores[newPlace]);
+    Serial.println(highscoreNames[newPlace]);
   }
 
   return newPlace;
@@ -1272,4 +1292,20 @@ void printDifficulty(byte difficulty) {
     default:
       break;
   }
+}
+
+void printScore() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.write("Score: ");
+  char scoreChar[4];
+  lcd.write(itoa(score, scoreChar, 10));
+}
+
+void printScoreBeat(int newPlace) {
+  lcd.setCursor(0, 1);
+  lcd.write("Score Beaten: ");
+  char placeChar[1];
+  newPlace += 1;
+  lcd.write(itoa(newPlace, placeChar, 10));
 }
